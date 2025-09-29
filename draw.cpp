@@ -1,21 +1,19 @@
 #include "draw.h"
 #include "objreader.h"
+#include "defs.h"
 
 #include <math.h>
 #include <iostream>
 #include <algorithm>
 
-constexpr TGAColor white   = {255, 255, 255, 255};
 std::pair<std::vector<int>, std::vector<int>> getBbox(int ax, int ay, int bx, int by, int cx, int cy);
+std::pair<std::vector<int>, std::vector<int>> getBbox(const Point& a, const Point& b, const Point& c); // Point封装
 
 void drawOBJ(std::string path, TGAImage& buffer)
 {
     auto vandf = objFileReader(path);
     std::vector<point_obj>& v = vandf.first;
     std::vector<face_obj>&  f = vandf.second;
-
-    // 已废弃
-    //float scale = SCALE_RATE * buffer.width() / v.begin()->x; // 希望最边边的点能缩放到屏幕整体的SCALE_RATE(默认0.95)处，根据比例就可以算出
 
     std::cout << "绘制中" << std::endl;
 
@@ -37,7 +35,7 @@ void drawOBJ(std::string path, TGAImage& buffer)
         drawLine(buffer, p1x, p1y, p3x, p3y, red);
         drawLine(buffer, p2x, p2y, p3x, p3y, red);
         */
-        drawTriangle(buffer, p1x, p1y, p2x, p2y, p3x, p3y, 
+        drawJustTriangle(buffer, p1x, p1y, p2x, p2y, p3x, p3y, 
                     {static_cast<unsigned char>(std::rand()%256), 
                      static_cast<unsigned char>(std::rand()%256), 
                      static_cast<unsigned char>(std::rand()%256)});
@@ -51,8 +49,41 @@ void drawOBJ(std::string path, TGAImage& buffer)
 }
 
 void drawTriangle  (TGAImage& buffer,
-                    int ax, int ay, int bx, int by, int cx, int cy,
-                    TGAColor color)
+                    Point A, Point B, Point C)
+{
+    auto bbox = getBbox(A, B, C);
+    double s_ABC = computeArea(A, B, C);
+
+    #pragma omp parallel for
+    for(auto px = bbox.first[0]; px < bbox.second[0]; px ++)
+    {
+        for(auto py = bbox.first[1]; py < bbox.second[1]; py ++)
+        {
+            double s_PBC = computeArea(Point{px,py}, B, C);
+            double s_PCA = computeArea(Point{px,py}, C, A);
+            double s_PAB = computeArea(Point{px,py}, A, B);
+
+            double alpha = s_PBC / s_ABC;
+            double beta  = s_PCA / s_ABC;
+            double gamma = s_PAB / s_ABC;
+
+            //if(std::signbit(alpha) == std::signbit(beta) && std::signbit(beta) == std::signbit(gamma))
+            if(std::signbit(alpha) || std::signbit(beta) || std::signbit(gamma))
+                continue;
+
+            buffer.set(px, py, 
+               {static_cast<std::uint8_t>(alpha*A.color[0]+beta*B.color[0]+gamma*C.color[0]),
+                static_cast<std::uint8_t>(alpha*A.color[1]+beta*B.color[1]+gamma*C.color[1]),    
+                static_cast<std::uint8_t>(alpha*A.color[2]+beta*B.color[2]+gamma*C.color[2]),
+                static_cast<std::uint8_t>(alpha*A.color[3]+beta*B.color[3]+gamma*C.color[3])});
+        }
+    }
+}
+
+// 绘制纯三角形，不计算重心坐标
+void drawJustTriangle  (TGAImage& buffer,
+                        int ax, int ay, int bx, int by, int cx, int cy,
+                        TGAColor color)
 {
     auto bbox = getBbox(ax, ay, bx, by, cx, cy);
     bool isNegtive = isNegtiveArea(ax, ay, bx, by, cx, cy);
@@ -86,8 +117,25 @@ void drawTriangle  (TGAImage& buffer,
     buffer.set(cx, cy, white);
 }
 
+// Point封装版本
 std::pair<std::vector<int>, std::vector<int>>
-getBbox(int ax, int ay, int bx, int by, int cx, int cy) // 获得BoundingBox
+getBbox(const Point& a, const Point& b, const Point& c) // 获得BoundingBox
+{
+    std::vector<int> lb_bbox, rt_bbox;
+    
+    auto mm = std::minmax({a.x, b.x, c.x});
+    lb_bbox.emplace_back(mm.first);
+    rt_bbox.emplace_back(mm.second);
+
+    mm = std::minmax({a.y, b.y, c.y});
+    lb_bbox.emplace_back(mm.first);
+    rt_bbox.emplace_back(mm.second);
+    
+    return std::make_pair(lb_bbox, rt_bbox);
+}
+
+std::pair<std::vector<int>, std::vector<int>>
+getBbox(int ax, int ay, int bx, int by, int cx, int cy) // 获得BoundingBox，格式是first[0]为xmin，second[0]为xmax，同理1为y
 {
     std::vector<int> lb_bbox, rt_bbox;
     
@@ -103,155 +151,9 @@ getBbox(int ax, int ay, int bx, int by, int cx, int cy) // 获得BoundingBox
 }
 
 /*
-inline
-void   drawLine(TGAImage& buffer,
-                int y, int x1, int x2,
-                TGAColor color) // 填充时用，绘制横线
-{    
-    if(x1 > x2)
-    {
-        std::swap(x1, x2);
-    }
-
-    for(int x = x1; x <= x2; x ++)
-    {
-        buffer.set(x, y, color);
-    }
-}
-
-{
-    // 标准扫描线渲染法
-    if(ay < by) { std::swap(ax, bx); std::swap(ay, by); }
-    if(ay < cy) { std::swap(ax, cx); std::swap(ay, cy); }
-    if(by < cy) { std::swap(bx, cx); std::swap(by, cy); }
-
-    int x1, x2;
-    //if(cy != ay) // cy 一定不等于 ay，否则坍缩成为一条直线，而by是可以与cy、ay相等的，效果就是有个平顶
-    
-    if(by != ay) // 具体判断原因见下方原理
-    for(int y = ay; y >= by; y --) // a->b
-    {
-        x1 = ax + (cx-ax)*(y-ay)/(cy-ay); // x2 = cx + (ax-cx)*(y-cy)/(ay-cy);
-        x2 = ax + (bx-ax)*(y-ay)/(by-ay); // 为何用整数除法？这里有妙处，注意是把k^-1拆开来的
-                                          // 先乘，与浮点等价；再除，获得整数，与用浮点除完截取整数部分是一样的
-                                          // 如果不先算乘法，精度会丢失
-        drawLine(buffer, y, x1, x2, color);
-    }
-    
-    if(cy != by)    
-    for(int y = cy; y < by; y ++) // c->b
-    {
-        x1 = cx + (ax-cx)*(y-cy)/(ay-cy);
-        x2 = cx + (bx-cx)*(y-cy)/(by-cy);
-        drawLine(buffer, y, x1, x2, color);
-    }
-
-    buffer.set(ax, ay, white);
-    buffer.set(bx, by, white);
-    buffer.set(cx, cy, white);
-}
+此处原有绘制三角形中的探索性代码：自制扫描线渲染法、标准扫描线渲染法，可在lec2的commit记录中找到，以供回顾
 */
-
-
-/* // homemade扫描线渲染法
-inline 
-bool drawLine(TGAImage& buffer,
-                int ax, int ay, int bx, int by,
-                TGAColor color, std::vector<int>& x_step) // 填充时用
-{
-    // 前面的准备与DDA无异
-    bool is_steep = std::abs(bx - ax) < std::abs(by - ay);
-    if(is_steep)
-    {
-        std::swap(ax, ay);
-        std::swap(bx, by);
-    }
-    bool is_swap = ax > bx;
-    if(is_swap) // 如果不是从左到右，那么交换起点终点
-    {
-        std::swap(ax, bx);
-        std::swap(ay, by);
-    }
-
-    int x_shift = bx - ax, y_shift = std::abs(by - ay);
-    int shift2 = ((by-ay)>0) ? 1 : -1;
-    int ierror = 0;
-    int y = ay;
-
-    for(int x = ax; x <= bx; x ++)
-    {
-        if(is_steep) // 先绘制，再累积误差
-        {
-            buffer.set(y, x, color);
-            x_step.emplace_back(y);
-        }
-        else
-        {
-            buffer.set(x, y, color);
-            x_step.emplace_back(x);
-        }
-        
-        // bug原因：当不陡峭时，x是绝对不会突变的，所以一个一个写进向量，但是对应的y是在变化的，等不起
-        // 这里的解决方法就是y没有变化时，就覆盖，这样就能保证
-        // if(ierror > x_shift) { x_step.pop_back(); } // 性能负优化：有if，和之前一样需要优化，见下
-        
-        ierror += 2 * y_shift; 
-        const bool if_shift = ierror > x_shift;
-        // 只在非陡峭时适用
-        if(!is_steep) { x_step.resize(x_step.size() - !if_shift); } // 减少分支的方法(来自GPT)，在软光栅直线中，if+pop 一定慢于 resize+内联判断 
-        y += shift2 * if_shift;
-        ierror -= 2 * x_shift * if_shift;
-    }
-
-    return (is_swap);
-}
-
-void drawTriangle  (TGAImage& buffer, 
-                    int ax, int ay, int bx, int by, int cx, int cy,
-                    TGAColor color)
-{
-    // 自制扫描线渲染法
-    if(ay < by) // 保证ay >= by >= cy
-    {
-        std::swap(ax, bx);
-        std::swap(ay, by);
-    }
-    if(ay < cy)
-    {
-        std::swap(ax, cx);
-        std::swap(ay, cy);
-    }
-    if(by < cy)
-    {
-        std::swap(bx, cx);
-        std::swap(by, cy);
-    }
-
-    std::vector<int> a2b_x, a2c_x, b2c_x; // 本以为用bool与初始值就可以描述像素点的位置，但发现要考虑水平上一下走很多距离，bool用不了，干脆上int
-    if(drawLine(buffer, ax, ay, bx, by, color, a2b_x)) { std::reverse(a2b_x.begin(), a2b_x.end());} // 发现在又陡峭交换、又左右交换的情况下，实际的绘制是从右到左、从下到上，需要颠倒一下
-    if(drawLine(buffer, ax, ay, cx, cy, color, a2c_x)) { std::reverse(a2c_x.begin(), a2c_x.end());} // 上面错了，实践证明，只要有左右交换，就需要颠倒
-    if(drawLine(buffer, bx, by, cx, cy, color, b2c_x)) { std::reverse(b2c_x.begin(), b2c_x.end());}
-
-    auto iter_a2b = a2b_x.begin(), iter_a2c = a2c_x.begin();
-    for(int y = ay; y > by; y --)
-    {
-        // drawLine(buffer, y, *(++iter_a2b), *(++iter_a2c), color); // 脑子糊涂了，*(++iter)是先自增
-        drawLine(buffer, y, *(iter_a2b++), *(iter_a2c++), color);
-    }
-
-    auto iter_b2c = b2c_x.begin();
-    for(int y = by; y > cy; y --)
-    {
-        drawLine(buffer, y, *(iter_b2c++), *(iter_a2c++), color);
-    }
-
-    buffer.set(ax, ay, white);
-    buffer.set(bx, by, white);
-    buffer.set(cx, cy, white);
-}
-*/
-
 
 /*
-此处原有绘制直线中的探索性代码：自制直线算法、标准的DDA算法，可在一开始的commit记录中找到，以供回顾
+此处原有绘制直线中的探索性代码：自制直线算法、标准的DDA算法，可在lec1的commit记录中找到，以供回顾
 */

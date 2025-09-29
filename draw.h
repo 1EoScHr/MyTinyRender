@@ -1,13 +1,19 @@
 #include "tgaimage.h"
+#include "defs.h"
+
 #include <iostream>
 
+void drawOBJ(std::string path, TGAImage& buffer);
+void drawJustTriangle  (TGAImage& buffer, int ax, int ay, int bx, int by, int cx, int cy, TGAColor color);
+void drawTriangle  (TGAImage& buffer, Point A, Point B, Point C);
+
 // inline函数的定义必须要写在.h文件中
-// 这里用优化写法的Bresenham光栅法
 inline
 void   drawLine(TGAImage& buffer,                   // TGAImage用引用传参还是指针传参？
                 int ax, int ay, int bx, int by,     // 效率上两者基本一致，因为引用在底层的实现就是指针；
                                 TGAColor color)     // 逻辑上，指针灵活，传递的可能为空，能代表“可选参数”
 {                                                   // 而引用必须绑定一个对象，表示这个对象一定有且要修改
+    // 这里用优化写法的Bresenham光栅法
     // 前面的准备与DDA无异
     bool is_steep = std::abs(bx - ax) < std::abs(by - ay);
     if(is_steep)
@@ -43,8 +49,14 @@ void   drawLine(TGAImage& buffer,                   // TGAImage用引用传参�
         ierror -= 2 * x_shift * (ierror > x_shift);
     }
 }
-void drawOBJ(std::string path, TGAImage& buffer);
-void drawTriangle  (TGAImage& buffer, int ax, int ay, int bx, int by, int cx, int cy, TGAColor color);
+
+inline
+double computeArea(const Point& a, const Point& b, const Point& c)
+{
+    // 研究了下为什么许多代码都用double而不是float，因为离线、高精度、累积误差
+    // GPT说这样写未来可能在超大空间渲染时会溢出，但我感觉应该不会
+    return (a.x*(b.y-c.y) + b.x*(c.y-a.y) + c.x*(a.y-b.y))/ 2.0; 
+}
 
 inline
 bool isNegtiveArea(int ax, int ay, int bx, int by, int cx, int cy) // 一个布尔量，即三角形的有向面积是否为负
