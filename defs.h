@@ -13,10 +13,11 @@ struct Point
 {
     int x;
     int y;
+    float depth = 0; // 把(-1)~1的z缩放为0-1的深度
     TGAColor color = white;
 
-    Point(int _x, int _y, TGAColor _c = white) // cpp的结构体也能有构造函数，因为其就是一个特殊的类（或者类是特殊的结构体？）
-        : x(_x), y(_y), color(_c) {}
+    Point(int _x, int _y, float _depth = 0, TGAColor _c = white) // cpp的结构体也能有构造函数，因为其就是一个特殊的类（或者类是特殊的结构体？）
+        : x(_x), y(_y), depth(_depth), color(_c) {}
 };
 
 #endif

@@ -4,52 +4,95 @@
 
 #include <math.h>
 #include <iostream>
+#include <ranges>
 #include <algorithm>
 
 std::pair<std::vector<int>, std::vector<int>> getBbox(int ax, int ay, int bx, int by, int cx, int cy);
 std::pair<std::vector<int>, std::vector<int>> getBbox(const Point& a, const Point& b, const Point& c); // Point封装
 
-void drawOBJ(std::string path, TGAImage& buffer)
+void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer)
 {
+    // 读取obj中的点、面信息
     auto vandf = objFileReader(path);
     std::vector<point_obj>& v = vandf.first;
     std::vector<face_obj>&  f = vandf.second;
 
     std::cout << "绘制中" << std::endl;
 
+    // 获取z的最大值与最小值，用于给z-buffer的可视黑白确定范围，这样能实现动态分配范围，更优雅
+    // 下面这个写法是C++20风味的，十分简洁优美，但是得加一个配置文件
+    // 第三个参数是投影参数，告诉编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
+    // 返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出
+    auto [minz, maxz] = std::ranges::minmax_element(v, {}, &point_obj::z);
+    float z_rate = 1.0f / (maxz->z - minz->z);
+    std::cout << minz->z << "  " << maxz->z << std::endl;
+
     for(auto iter = f.begin(); iter != f.end(); iter ++)
     {
         auto p1 = v[iter->v1], p2 = v[iter->v2], p3 = v[iter->v3];
         auto w = buffer.width()/2;
 
-        // auto p1x = std::round((p1.x+1)*w); // round命令返回double(float)，不管是在这里转int还是调入函数默认转换都有额外开销
-        auto p1x = std::lround((p1.x+1)*w);   // 使用lround命令，其返回long，能省去这一步，尽管在linux下long是64位，但开销也比float小
-        auto p1y = std::lround((p1.y+1)*w);
-        auto p2x = std::lround((p2.x+1)*w);
-        auto p2y = std::lround((p2.y+1)*w);
-        auto p3x = std::lround((p3.x+1)*w);
-        auto p3y = std::lround((p3.y+1)*w);
-        
-        /*
-        drawLine(buffer, p1x, p1y, p2x, p2y, red);
-        drawLine(buffer, p1x, p1y, p3x, p3y, red);
-        drawLine(buffer, p2x, p2y, p3x, p3y, red);
-        */
-        drawJustTriangle(buffer, p1x, p1y, p2x, p2y, p3x, p3y, 
-                    {static_cast<unsigned char>(std::rand()%256), 
-                     static_cast<unsigned char>(std::rand()%256), 
-                     static_cast<unsigned char>(std::rand()%256)});
-
-        buffer.set(p1x, p1y, white);
-        buffer.set(p2x, p2y, white);
-        buffer.set(p3x, p3y, white);
+        // auto p1x = std::round((p1.x+1)*w); 
+        // round命令返回double(float)，不管是在这里转int还是调入函数默认转换都有额外开销
+        // 使用lround命令，其返回long，能省去这一步，尽管在linux下long是64位，但开销也比float小
+        drawTriangle(buffer, zbuffer,
+                    {static_cast<int>(std::lround((p1.x+1)*w)), static_cast<int>(std::lround((p1.y+1)*w)), (maxz->z-p1.z)*z_rate, getRandomColor()},
+                    {static_cast<int>(std::lround((p2.x+1)*w)), static_cast<int>(std::lround((p2.y+1)*w)), (maxz->z-p2.z)*z_rate, getRandomColor()},
+                    {static_cast<int>(std::lround((p3.x+1)*w)), static_cast<int>(std::lround((p3.y+1)*w)), (maxz->z-p3.z)*z_rate, getRandomColor()});
     }
     
     std::cout << "绘制完毕" << std::endl;
 }
 
-void drawTriangle  (TGAImage& buffer,
+// 计算重心坐标
+void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer,
                     Point A, Point B, Point C)
+{
+    auto bbox = getBbox(A, B, C);
+    double s_ABC = computeArea(A, B, C);
+
+    // 背面剔除器，一种优化，原理见drawjusttriangle中的注释
+    if(std::signbit(s_ABC)) return;
+
+    // 让编译器把紧跟其后的 for 循环并行化，在多核 CPU 上让不同线程分工执行循环迭代
+    #pragma omp parallel for
+    for(auto px = bbox.first[0]; px < bbox.second[0]; px ++)
+    {
+        for(auto py = bbox.first[1]; py < bbox.second[1]; py ++)
+        {
+            // 计算重心坐标
+            double s_PBC = computeArea(Point{px,py}, B, C);
+            double s_PCA = computeArea(Point{px,py}, C, A);
+            double s_PAB = computeArea(Point{px,py}, A, B);
+
+            double alpha = s_PBC / s_ABC;
+            double beta  = s_PCA / s_ABC;
+            double gamma = s_PAB / s_ABC;
+
+            // 判断是否在三角形内
+            //if(std::signbit(alpha) == std::signbit(beta) && std::signbit(beta) == std::signbit(gamma))
+            if(std::signbit(alpha) || std::signbit(beta) || std::signbit(gamma))
+                continue;
+
+            // z-buffer更新，这里用方法效率可能比较低
+            float d = alpha*A.depth + beta*B.depth + gamma*C.depth; // 计算当前点深度
+            if(d > zbuffer.getd(px, py)) continue; // 如果比现有更深，则不画
+            auto c = static_cast<std::uint8_t>(255*(1-d));
+            zbuffer.set(px, py, {c, c, c, 255});
+            
+            // 填充正经buffer
+            buffer.set(px, py, 
+               {static_cast<std::uint8_t>(alpha*A.color[0]+beta*B.color[0]+gamma*C.color[0]),
+                static_cast<std::uint8_t>(alpha*A.color[1]+beta*B.color[1]+gamma*C.color[1]),    
+                static_cast<std::uint8_t>(alpha*A.color[2]+beta*B.color[2]+gamma*C.color[2]),
+                static_cast<std::uint8_t>(alpha*A.color[3]+beta*B.color[3]+gamma*C.color[3])});
+        }
+    }
+}
+
+// 单纯绘制z-buffer深度图
+void drawTriangle_zbuffer  (TGAImage& buffer,
+                            Point A, Point B, Point C)
 {
     auto bbox = getBbox(A, B, C);
     double s_ABC = computeArea(A, B, C);
@@ -59,6 +102,7 @@ void drawTriangle  (TGAImage& buffer,
     {
         for(auto py = bbox.first[1]; py < bbox.second[1]; py ++)
         {
+            // 计算重心坐标
             double s_PBC = computeArea(Point{px,py}, B, C);
             double s_PCA = computeArea(Point{px,py}, C, A);
             double s_PAB = computeArea(Point{px,py}, A, B);
@@ -67,15 +111,13 @@ void drawTriangle  (TGAImage& buffer,
             double beta  = s_PCA / s_ABC;
             double gamma = s_PAB / s_ABC;
 
-            //if(std::signbit(alpha) == std::signbit(beta) && std::signbit(beta) == std::signbit(gamma))
+            // 判断是否在三角形内
             if(std::signbit(alpha) || std::signbit(beta) || std::signbit(gamma))
                 continue;
 
-            buffer.set(px, py, 
-               {static_cast<std::uint8_t>(alpha*A.color[0]+beta*B.color[0]+gamma*C.color[0]),
-                static_cast<std::uint8_t>(alpha*A.color[1]+beta*B.color[1]+gamma*C.color[1]),    
-                static_cast<std::uint8_t>(alpha*A.color[2]+beta*B.color[2]+gamma*C.color[2]),
-                static_cast<std::uint8_t>(alpha*A.color[3]+beta*B.color[3]+gamma*C.color[3])});
+            // 绘制
+            auto foo = static_cast<std::uint8_t>(255*(alpha*A.depth + beta*B.depth + gamma*C.depth));
+            buffer.set(px, py, {foo, foo, foo, 255});
         }
     }
 }

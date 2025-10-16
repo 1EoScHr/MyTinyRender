@@ -3,11 +3,21 @@
 
 #include <iostream>
 
-void drawOBJ(std::string path, TGAImage& buffer);
+void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer);
 void drawJustTriangle  (TGAImage& buffer, int ax, int ay, int bx, int by, int cx, int cy, TGAColor color);
-void drawTriangle  (TGAImage& buffer, Point A, Point B, Point C);
+void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer, Point A, Point B, Point C);
+void drawTriangle_zbuffer  (TGAImage& buffer, Point A, Point B, Point C);
 
 // inline函数的定义必须要写在.h文件中
+inline 
+TGAColor getRandomColor(void) // 获取随机颜色
+{
+    return {static_cast<unsigned char>(std::rand()%256), 
+            static_cast<unsigned char>(std::rand()%256), 
+            static_cast<unsigned char>(std::rand()%256),
+            255};
+}
+
 inline
 void   drawLine(TGAImage& buffer,                   // TGAImage用引用传参还是指针传参？
                 int ax, int ay, int bx, int by,     // 效率上两者基本一致，因为引用在底层的实现就是指针；
