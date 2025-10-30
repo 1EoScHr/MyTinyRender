@@ -5,8 +5,8 @@
 
 void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer);
 void drawJustTriangle  (TGAImage& buffer, int ax, int ay, int bx, int by, int cx, int cy, TGAColor color);
-void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer, Point A, Point B, Point C);
-void drawTriangle_zbuffer  (TGAImage& buffer, Point A, Point B, Point C);
+void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer, Pixel A, Pixel B, Pixel C);
+void drawTriangle_zbuffer  (TGAImage& buffer, Pixel A, Pixel B, Pixel C);
 
 // inline函数的定义必须要写在.h文件中
 inline 
@@ -61,7 +61,7 @@ void   drawLine(TGAImage& buffer,                   // TGAImage用引用传参�
 }
 
 inline
-double computeArea(const Point& a, const Point& b, const Point& c)
+double computeArea(const Pixel& a, const Pixel& b, const Pixel& c)
 {
     // 研究了下为什么许多代码都用double而不是float，因为离线、高精度、累积误差
     // GPT说这样写未来可能在超大空间渲染时会溢出，但我感觉应该不会

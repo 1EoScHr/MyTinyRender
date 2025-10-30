@@ -3,28 +3,10 @@
 #include <fstream>
 #include <algorithm>
 
+#include "defs.h"
 #include "objreader.h"
 
-// 该函数已废弃，因为v中的坐标在没有缩放项时不会大于1，之前看到的是vt项中的
-inline float OBJ_max_coordinate(std::vector<point_obj> v) // 返回坐标向量中最大的坐标，用于缩放画面
-{
-    float ret = 0;
-
-    for(const auto& p : v)
-    {
-        // ret = std::max({ret, std::abs(p.x), std::abs(p.y), std::abs(p.z)}); // 选择元组中最大的一个
-
-        // 下面这样写可以避免创建元组对象，性能强
-        if(std::abs(p.x) > ret) {ret = std::abs(p.x);}
-        if(std::abs(p.y) > ret) {ret = std::abs(p.y);}
-        if(std::abs(p.z) > ret) {ret = std::abs(p.z);}
-    }
-
-    std::cout << "max:" << ret << std::endl;
-    return ret;
-}
-
-std::pair<std::vector<point_obj>, std::vector<face_obj>> // 暂时只需要顶点坐标、面的组成
+std::pair<std::vector<vec3>, std::vector<face_obj>> // 暂时只需要顶点坐标、面的组成
 objFileReader(std::string path)
 {
     std::ifstream file(path);
@@ -35,7 +17,7 @@ objFileReader(std::string path)
     }
     
     // 要读取的关键信息
-    std::vector<point_obj> v; // cpp有类型名字自动提升，相当于直接typedef
+    std::vector<vec3> v; // cpp有类型名字自动提升，相当于直接typedef
     std::vector<face_obj> f;
 
     std::string linetype; // 读取第一个字符串，判断该行存放的是什么
@@ -111,3 +93,23 @@ objFileReader(std::string path)
     return std::make_pair(v, f);
 }
 
+// 该函数已废弃，因为v中的坐标在没有缩放项时不会大于1，之前看到的是vt项中的
+/*
+inline float OBJ_max_coordinate(std::vector<point_obj> v) // 返回坐标向量中最大的坐标，用于缩放画面
+{
+    float ret = 0;
+
+    for(const auto& p : v)
+    {
+        // ret = std::max({ret, std::abs(p.x), std::abs(p.y), std::abs(p.z)}); // 选择元组中最大的一个
+
+        // 下面这样写可以避免创建元组对象，性能强
+        if(std::abs(p.x) > ret) {ret = std::abs(p.x);}
+        if(std::abs(p.y) > ret) {ret = std::abs(p.y);}
+        if(std::abs(p.z) > ret) {ret = std::abs(p.z);}
+    }
+
+    std::cout << "max:" << ret << std::endl;
+    return ret;
+}
+*/

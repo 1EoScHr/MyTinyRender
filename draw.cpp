@@ -8,23 +8,23 @@
 #include <algorithm>
 
 std::pair<std::vector<int>, std::vector<int>> getBbox(int ax, int ay, int bx, int by, int cx, int cy);
-std::pair<std::vector<int>, std::vector<int>> getBbox(const Point& a, const Point& b, const Point& c); // Point封装
+std::pair<std::vector<int>, std::vector<int>> getBbox(const Pixel& a, const Pixel& b, const Pixel& c); // Pixel封装
 
 void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer)
 {
     // 读取obj中的点、面信息
     auto vandf = objFileReader(path);
-    std::vector<point_obj>& v = vandf.first;
+    std::vector<vec3>& v = vandf.first;
     std::vector<face_obj>&  f = vandf.second;
 
     std::cout << "绘制中" << std::endl;
 
     // 获取z的最大值与最小值，用于给z-buffer的可视黑白确定范围，这样能实现动态分配范围，更优雅
-    // 下面这个写法是C++20风味的，十分简洁优美，但是得加一个配置文件
+    // 下面这个写法是C++20风味的，十分简洁优美，但是得加一个配置文件让vscode支持cpp20语法
     // 第三个参数是投影参数，告诉编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
     // 返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出
-    auto [minz, maxz] = std::ranges::minmax_element(v, {}, &point_obj::z);
-    float z_rate = 1.0f / (maxz->z - minz->z);
+    auto [minz, maxz] = std::ranges::minmax_element(v, {}, &vec3::z);
+    double z_rate = 1.0f / (maxz->z - minz->z);
     std::cout << minz->z << "  " << maxz->z << std::endl;
 
     for(auto iter = f.begin(); iter != f.end(); iter ++)
@@ -44,9 +44,9 @@ void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer)
     std::cout << "绘制完毕" << std::endl;
 }
 
-// 计算重心坐标
+// 绘制三角形，并计算重心坐标
 void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer,
-                    Point A, Point B, Point C)
+                    Pixel A, Pixel B, Pixel C)
 {
     auto bbox = getBbox(A, B, C);
     double s_ABC = computeArea(A, B, C);
@@ -61,9 +61,9 @@ void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer,
         for(auto py = bbox.first[1]; py < bbox.second[1]; py ++)
         {
             // 计算重心坐标
-            double s_PBC = computeArea(Point{px,py}, B, C);
-            double s_PCA = computeArea(Point{px,py}, C, A);
-            double s_PAB = computeArea(Point{px,py}, A, B);
+            double s_PBC = computeArea(Pixel{px,py}, B, C);
+            double s_PCA = computeArea(Pixel{px,py}, C, A);
+            double s_PAB = computeArea(Pixel{px,py}, A, B);
 
             double alpha = s_PBC / s_ABC;
             double beta  = s_PCA / s_ABC;
@@ -92,7 +92,7 @@ void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer,
 
 // 单纯绘制z-buffer深度图
 void drawTriangle_zbuffer  (TGAImage& buffer,
-                            Point A, Point B, Point C)
+                            Pixel A, Pixel B, Pixel C)
 {
     auto bbox = getBbox(A, B, C);
     double s_ABC = computeArea(A, B, C);
@@ -103,9 +103,9 @@ void drawTriangle_zbuffer  (TGAImage& buffer,
         for(auto py = bbox.first[1]; py < bbox.second[1]; py ++)
         {
             // 计算重心坐标
-            double s_PBC = computeArea(Point{px,py}, B, C);
-            double s_PCA = computeArea(Point{px,py}, C, A);
-            double s_PAB = computeArea(Point{px,py}, A, B);
+            double s_PBC = computeArea(Pixel{px,py}, B, C);
+            double s_PCA = computeArea(Pixel{px,py}, C, A);
+            double s_PAB = computeArea(Pixel{px,py}, A, B);
 
             double alpha = s_PBC / s_ABC;
             double beta  = s_PCA / s_ABC;
@@ -159,9 +159,9 @@ void drawJustTriangle  (TGAImage& buffer,
     buffer.set(cx, cy, white);
 }
 
-// Point封装版本
+// Pixel封装版本
 std::pair<std::vector<int>, std::vector<int>>
-getBbox(const Point& a, const Point& b, const Point& c) // 获得BoundingBox
+getBbox(const Pixel& a, const Pixel& b, const Pixel& c) // 获得BoundingBox
 {
     std::vector<int> lb_bbox, rt_bbox;
     
