@@ -22,8 +22,9 @@ int main(int argc, char** argv) {
     std::string path1 = "../obj/diablo3_pose/diablo3_pose.obj";
     std::string path2 = "../obj/african_head/african_head.obj";
 
-    Rotate rot(_PI/6, _PI/6, _PI/6);
-    drawOBJ(path1, framebuffer, zbuffer, rot);
+    // 镜头朝向-z轴，上方是y轴，右方是x轴，
+    Rotate rot(0, _PI/2, 0);
+    drawOBJ(path1, framebuffer, zbuffer, rot, true, 3);
 
     framebuffer.write_tga_file("framebuffer.tga");
     zbuffer.write_tga_file("zbuffer.tga");

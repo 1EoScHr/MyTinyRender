@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot);
+void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot, bool perspective, double c_pos);
 void drawJustTriangle  (TGAImage& buffer, int ax, int ay, int bx, int by, int cx, int cy, TGAColor color);
 void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer, Pixel A, Pixel B, Pixel C);
 void drawTriangle_zbuffer  (TGAImage& buffer, Pixel A, Pixel B, Pixel C);

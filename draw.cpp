@@ -10,42 +10,51 @@
 std::pair<std::vector<int>, std::vector<int>> getBbox(int ax, int ay, int bx, int by, int cx, int cy);
 std::pair<std::vector<int>, std::vector<int>> getBbox(const Pixel& a, const Pixel& b, const Pixel& c); // Pixel封装
 
-void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot)
+void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot, bool perspective, double c_pos)
 {
+    std::cout << "绘制中" << std::endl;
+
     // 读取obj中的点、面信息
     auto vandf = objFileReader(path);
     std::vector<vec3>& v = vandf.first;
     std::vector<face_obj>&  f = vandf.second;
 
     // 获取rot对应的旋转矩阵
-    //auto [xrotmat, yrotmat, zrotmat] = getRotMat(rot);
     auto rotmat = getRotMat(rot);
 
-    std::cout << "绘制中" << std::endl;
-
-    // 将所有点旋转
+    // 将模型的所有点应用旋转
     //for (auto iter = v.begin(); iter != v.end(); iter ++)
-    for (auto& iter : v)
+    for (auto& iter : v)    // 更现代的写法，自动解引用、需要修改容器值
     {
         iter = rotmat * iter;
     }
 
-    // 获取z的最大值与最小值，用于给z-buffer的可视黑白确定范围，这样能实现动态分配范围，更优雅
-    // 下面这个写法是C++20风味的，十分简洁优美，但是得加一个配置文件让vscode支持cpp20语法
-    // 第三个参数是投影参数，告诉编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
-    // 返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出
+    /*
+    获取z的最大值与最小值
+    1.界定near与far，辅助进行透视（如果选择了透视投影）
+    2.用于给z-buffer的灰度图确定范围，这样能实现动态分配范围，更优雅
+    
+    下面这个写法是C++20风味的，十分简洁优美，但是得加一个配置文件让vscode支持cpp20语法
+    第三个参数是投影参数，告诉编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
+    返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出    
+    */
     auto [minz, maxz] = std::ranges::minmax_element(v, {}, &vec3::z);
-    double z_rate = 1.0f / (maxz->z - minz->z);
-    std::cout << minz->z << "  " << maxz->z << std::endl;
+    // std::cout << minz->z << "  " << maxz->z << std::endl;
+    double z_rate = 1.0f / (maxz->z - minz->z); // 辅助把在maxz与minz之间的z映射到0-1
 
-    for(auto iter = f.begin(); iter != f.end(); iter ++)
+
+
+    //for(auto iter = f.begin(); iter != f.end(); iter ++)
+    for(auto& iter : f)
     {
-        auto p1 = v[iter->v1], p2 = v[iter->v2], p3 = v[iter->v3];
+        auto p1 = v[iter.v1], p2 = v[iter.v2], p3 = v[iter.v3];
         auto w = buffer.width()/2;
 
-        // auto p1x = std::round((p1.x+1)*w); 
-        // round命令返回double(float)，不管是在这里转int还是调入函数默认转换都有额外开销
-        // 使用lround命令，其返回long，能省去这一步，尽管在linux下long是64位，但开销也比float小
+        /*
+        auto p1x = std::round((p1.x+1)*w); 
+        round命令返回double(float)，不管是在这里转int还是调入函数默认转换都有额外开销
+        使用lround命令，其返回long，能省去这一步，尽管在linux下long是64位，但开销也比float小
+        */
         drawTriangle(buffer, zbuffer,
                     {static_cast<int>(std::lround((p1.x+1)*w)), static_cast<int>(std::lround((p1.y+1)*w)), (maxz->z-p1.z)*z_rate, getRandomColor()},
                     {static_cast<int>(std::lround((p2.x+1)*w)), static_cast<int>(std::lround((p2.y+1)*w)), (maxz->z-p2.z)*z_rate, getRandomColor()},
@@ -55,7 +64,7 @@ void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot)
     std::cout << "绘制完毕" << std::endl;
 }
 
-// 绘制三角形，并计算重心坐标
+// 计算重心坐标，在原图与zbuffer上绘制三角形
 void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer,
                     Pixel A, Pixel B, Pixel C)
 {
