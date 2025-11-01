@@ -10,14 +10,25 @@
 std::pair<std::vector<int>, std::vector<int>> getBbox(int ax, int ay, int bx, int by, int cx, int cy);
 std::pair<std::vector<int>, std::vector<int>> getBbox(const Pixel& a, const Pixel& b, const Pixel& c); // Pixel封装
 
-void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer)
+void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot)
 {
     // 读取obj中的点、面信息
     auto vandf = objFileReader(path);
     std::vector<vec3>& v = vandf.first;
     std::vector<face_obj>&  f = vandf.second;
 
+    // 获取rot对应的旋转矩阵
+    //auto [xrotmat, yrotmat, zrotmat] = getRotMat(rot);
+    auto rotmat = getRotMat(rot);
+
     std::cout << "绘制中" << std::endl;
+
+    // 将所有点旋转
+    //for (auto iter = v.begin(); iter != v.end(); iter ++)
+    for (auto& iter : v)
+    {
+        iter = rotmat * iter;
+    }
 
     // 获取z的最大值与最小值，用于给z-buffer的可视黑白确定范围，这样能实现动态分配范围，更优雅
     // 下面这个写法是C++20风味的，十分简洁优美，但是得加一个配置文件让vscode支持cpp20语法
@@ -192,6 +203,32 @@ getBbox(int ax, int ay, int bx, int by, int cx, int cy) // 获得BoundingBox，�
     return std::make_pair(lb_bbox, rt_bbox);
 }
 
+//std::tuple<mat3, mat3, mat3>
+mat3
+getRotMat(Rotate& rot)
+{
+    double sinx = std::sin(rot.x), cosx = std::cos(rot.x);
+    double siny = std::sin(rot.y), cosy = std::cos(rot.y);
+    double sinz = std::sin(rot.z), cosz = std::cos(rot.z);
+
+    mat3 xrotmat = {}, yrotmat = {}, zrotmat = {};
+
+    // 旋转矩阵特点是绕谁转，谁就不会变，保留原来的值，因此能确定一行；同样的，其他维度旋转就与该轴无关，这样就确定一列
+    xrotmat(0, 0) = 1, xrotmat(0, 1) =    0, xrotmat(0, 2) =     0, 
+    xrotmat(1, 0) = 0, xrotmat(1, 1) = cosx, xrotmat(1, 2) = -sinx, 
+    xrotmat(2, 0) = 0, xrotmat(2, 1) = sinx, xrotmat(2, 2) =  cosx; 
+
+    yrotmat(0, 0) =  cosy, yrotmat(0, 1) = 0, yrotmat(0, 2) = siny, 
+    yrotmat(1, 0) =     0, yrotmat(1, 1) = 1, yrotmat(1, 2) =    0, 
+    yrotmat(2, 0) = -siny, yrotmat(2, 1) = 0, yrotmat(2, 2) = cosy; 
+
+    zrotmat(0, 0) = cosz, zrotmat(0, 1) = -sinz, zrotmat(0, 2) = 0, 
+    zrotmat(1, 0) = sinz, zrotmat(1, 1) =  cosz, zrotmat(1, 2) = 0, 
+    zrotmat(2, 0) =    0, zrotmat(2, 1) =     0, zrotmat(2, 2) = 1; 
+
+    // return {xrotmat, yrotmat, zrotmat};
+    return zrotmat*yrotmat*xrotmat; // 先x再y再z
+}
 /*
 此处原有绘制三角形中的探索性代码：自制扫描线渲染法、标准扫描线渲染法，可在lec2的commit记录中找到，以供回顾
 */

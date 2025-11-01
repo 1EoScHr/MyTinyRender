@@ -6,6 +6,8 @@
 #include "tgaimage.h"
 #include "defs.cpp" // 由于模板先占位、用时解析的特性，所以要在.h中include.cpp
 
+#define _PI (3.1415926)
+
 // TGAColor颜色宏
 constexpr TGAColor white   = {255, 255, 255, 255}; // attention, BGRA order // constexpr：告诉编译器在编译器这个东西就能算出来
 constexpr TGAColor green   = {  0, 255,   0, 255};
@@ -17,12 +19,23 @@ struct Pixel    // 这里原来是叫Point，但有vec3后，就得更具体，�
 {
     int x;
     int y;
-    double depth = 0; // 把(-1)~1的z缩放为0-1的深度
-    TGAColor color = white;
+    double depth; // 把(-1)~1的z缩放为0-1的深度
+    TGAColor color;
 
     // 构造函数
     Pixel(int _x, int _y, double _depth = 0, TGAColor _c = white)
         : x(_x), y(_y), depth(_depth), color(_c) {}
 };
+
+struct Rotate
+{
+    double x;
+    double y;
+    double z;
+
+    Rotate(double _x = 0, double _y = 0, double _z = 0)
+        : x(_x), y(_y), z(_z) {}
+};
+
 
 #endif
