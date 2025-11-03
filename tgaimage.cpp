@@ -177,11 +177,11 @@ TGAColor TGAImage::get(const int x, const int y) const {
     return ret;
 }
 
-// 以上面的get为原型，专用于zbuffer的从灰度图获取深度
-float TGAImage::getd(const int x, const int y) const{
+// 以上面的get为原型，专用于zbuffer的从灰度图获取深度，是从[0, 255]到[-1, 1]的映射
+double TGAImage::getdepth(const int x, const int y) const{
     if (!data.size() || x<0 || y<0 || x>=w || y>=h) return {};
     const std::uint8_t *p = data.data()+(x+y*w)*bpp;
-    return 1.0f-static_cast<float>(p[0])/255.0f;
+    return (p[0]/127.5 - 1);
 }
 
 void TGAImage::set(int x, int y, const TGAColor &c) {

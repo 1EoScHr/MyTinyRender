@@ -64,7 +64,7 @@ struct TGAImage {
     void flip_horizontally();
     void flip_vertically();
     TGAColor get(const int x, const int y) const;
-    float getd(const int x, const int y) const;
+    double getdepth(const int x, const int y) const;
     void set(const int x, const int y, const TGAColor &c);
     int width()  const; // const修饰成员函数本身，是用来获取私有变量w、h值的只读接口
     int height() const;

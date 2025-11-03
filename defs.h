@@ -19,7 +19,7 @@ struct Pixel    // 这里原来是叫Point，但有vec3后，就得更具体，�
 {
     int x;
     int y;
-    double depth; // 把(-1)~1的z缩放为0-1的深度
+    double depth; // 把[far, near]的z缩放为[-1, 1]的深度
     TGAColor color;
 
     // 构造函数
@@ -27,7 +27,7 @@ struct Pixel    // 这里原来是叫Point，但有vec3后，就得更具体，�
         : x(_x), y(_y), depth(_depth), color(_c) {}
 };
 
-struct Rotate
+struct Rotate   // 要求弧度
 {
     double x;
     double y;
