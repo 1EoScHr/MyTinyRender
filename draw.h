@@ -3,11 +3,15 @@
 
 #include <iostream>
 
-void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot, bool perspective, double c_pos);
+void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer);
 void drawJustTriangle  (TGAImage& buffer, int ax, int ay, int bx, int by, int cx, int cy, TGAColor color);
 void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer, Pixel A, Pixel B, Pixel C);
 void drawTriangle_zbuffer  (TGAImage& buffer, Pixel A, Pixel B, Pixel C);
-mat3 getRotMat(Rotate& rot);
+mat4 getRotMat(double sinx, int axis);
+mat4 getModelMat(Model& modelInfo);
+mat4 getViewMat(Camera& camInfo);
+mat4 getProjMat(Frustum& fruInfo);
+mat4 getViewportMat(const TGAImage& buffer);
 
 // inline函数的定义必须要写在.h文件中
 inline 

@@ -6,7 +6,7 @@
 #include "defs.h"
 #include "objreader.h"
 
-std::pair<std::vector<vec3>, std::vector<face_obj>> // 暂时只需要顶点坐标、面的组成
+std::pair<std::vector<vec4>, std::vector<face_obj>> // 暂时只需要顶点坐标、面的组成
 objFileReader(std::string path)
 {
     std::ifstream file(path);
@@ -17,13 +17,13 @@ objFileReader(std::string path)
     }
     
     // 要读取的关键信息
-    std::vector<vec3> v; // cpp有类型名字自动提升，相当于直接typedef
+    std::vector<vec4> v; // cpp有类型名字自动提升，相当于直接typedef
     std::vector<face_obj> f;
 
     std::string linetype; // 读取第一个字符串，判断该行存放的是什么
-    float dummy = 0; // 垃圾值
+    double dummy = 0; // 垃圾值
 
-    v.emplace_back(dummy, dummy, dummy); // 用垃圾值填充v的第一项，这样就能让索引对应了
+    v.emplace_back(dummy, dummy, dummy, 1); // 用垃圾值填充v的第一项，这样就能让索引对应了
 
     while (!file.eof())
     {
@@ -39,6 +39,7 @@ objFileReader(std::string path)
 
             v.emplace_back(); // 在末尾构造一个新对象
             file >> v.back().x >> v.back().y >> v.back().z; // 这样能节省一次拷贝开销
+            v.back().w = 1; // 是一个点，齐次坐标w值为1
         }
         else
         {

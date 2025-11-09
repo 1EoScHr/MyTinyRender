@@ -10,7 +10,85 @@
 std::pair<std::vector<int>, std::vector<int>> getBbox(int ax, int ay, int bx, int by, int cx, int cy);
 std::pair<std::vector<int>, std::vector<int>> getBbox(const Pixel& a, const Pixel& b, const Pixel& c); // Pixel封装
 
-void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot, bool perspective = true, double c_pos = 3)
+void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer)
+{
+    std::cout << "绘制中" << std::endl;
+
+    // 读取obj中的点、面信息
+    auto vandf = objFileReader(path);
+    std::vector<vec4>& v = vandf.first;
+    std::vector<face_obj>& f = vandf.second;
+
+    mat4 MV, PV, modelMat, viewMat, projMat, viewportMat;
+    Model modelInfo;    // 默认参数
+    Camera camInfo;     // 默认参数
+
+    /* TODO：这里后期添加模型相关处理逻辑
+    
+    
+    */
+
+    // 模型变换 Model
+    modelMat = getModelMat(modelInfo);
+    // 视图变换 view/Camera
+    viewMat = getViewMat(camInfo);
+
+    MV = viewMat * modelMat;   
+    for (auto& iter : v)    // 先进行模型、视图变换，此时物体都不会再变化了，z上也固定；至于开销，是可以容忍的
+    {
+        iter = MV * iter;
+        assert(iter.w == 1);
+    }
+
+    // 获取z坐标的最大值与最小值，界定near与far，辅助进行透视
+    /*
+        这个写法是C++20风味的，简洁优美，但得加配置文件让vscode支持cpp20语法
+        &vec4::z是投影参数，让编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
+        返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出
+    */
+    auto [zfar, znear] = std::ranges::minmax_element(v, {}, &vec4::z);
+    Frustum fruInfo(M_PI/2, buffer.width()/static_cast<double>(buffer.height()), znear->z, zfar->z);   // 初始化视锥，可视角90度，宽高比与屏幕相关（不相关会让画面拉伸），使用near与far
+
+    /*  TODO：这里后期添加视锥处理逻辑
+    
+    
+    */
+
+    // 投影变换 Projection
+    projMat = getProjMat(fruInfo);
+    // 视口变换 Viewport
+    viewportMat = getViewportMat(buffer);
+
+    PV = viewportMat * projMat;
+    for (auto& iter : v)        // 再进行投影、视口变换，把东西先映射到[-1,1]^3，再到屏幕区域。
+    {
+        iter = PV * iter;
+        uintize(iter);
+    }
+
+    for(auto& iter : f)
+    {
+        auto p1 = v[iter.v1], p2 = v[iter.v2], p3 = v[iter.v3];
+       
+        /*
+        auto p1x = std::round((p1.x+1)*w); 
+        round命令返回double(float)，不管是在这里转int还是调入函数默认转换都有额外开销
+        使用lround命令，其返回long，能省去这一步，尽管在linux下long是64位，但开销也比float小
+        */
+        drawTriangle(buffer, zbuffer,
+                    {static_cast<int>(std::lround(p1.x)), static_cast<int>(std::lround(p1.y)), p1.z, getRandomColor()},
+                    {static_cast<int>(std::lround(p2.x)), static_cast<int>(std::lround(p2.y)), p2.z, getRandomColor()},
+                    {static_cast<int>(std::lround(p3.x)), static_cast<int>(std::lround(p3.y)), p3.z, getRandomColor()});
+    }
+    
+    std::cout << "绘制完毕" << std::endl;
+}
+
+/*
+    这里是navie camera一节中用三维矩阵、向量完成的“MVP变换”，做了不少小巧思，以及疑惑。
+    在引入齐次坐标后，修改了框架，这一navie版本不兼容。
+
+void drawOBJ_navie(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot, bool perspective = true, double c_pos = 3)
 {
     std::cout << "绘制中" << std::endl;
 
@@ -33,15 +111,15 @@ void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot,
     // 这一节还没有引入齐次坐标，无法平移等，所以暂时没有视图变换（或者说是一个默认的视图变换）
 
     // 接下来就是投影变换
-    /*
-    获取实际z坐标的最大值与最小值
-    1.界定near与far，辅助进行透视（如果选择了透视投影），提供任意空间->[-1, 1]^3空间的映射
-    2.给z-buffer灰度可视化提供深度->灰度的变换，随着模型的具体情况动态分配
+    //
+    // 获取实际z坐标的最大值与最小值
+    // 1.界定near与far，辅助进行透视（如果选择了透视投影），提供任意空间->[-1, 1]^3空间的映射
+    // 2.给z-buffer灰度可视化提供深度->灰度的变换，随着模型的具体情况动态分配
     
-    下面这个写法是C++20风味的，十分简洁优美，但是得加一个配置文件让vscode支持cpp20语法
-    第三个参数是投影参数，告诉编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
-    返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出    
-    */
+    // 下面这个写法是C++20风味的，十分简洁优美，但是得加一个配置文件让vscode支持cpp20语法
+    // 第三个参数是投影参数，告诉编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
+    // 返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出    
+
     auto [zfar, znear] = std::ranges::minmax_element(v, {}, &vec3::z);
     // std::cout << zfar->z << "  " << znear->z << std::endl;
     double z_muti = 2.0 / (znear->z - zfar->z); // 把[zfar,znear]的z映射到[-1, 1]: 2/(znear-zfar)*(z-zfar)-1 = 2z/(znear-zfar)-(znear+zfar)/(znear-zfar)
@@ -50,21 +128,20 @@ void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot,
     // 把xy根据z进行透视变换
     if(perspective) // 如果选择了透视投影
     {
-        /*
-        本来结合GAMES的内容，透视变换是在near平面上，而非0；
+        // 本来结合GAMES的内容，透视变换是在near平面上，而非0；
         // double crate = c_pos - znear->z;
         // double crate = c_pos - zfar->z;
-        可是如上试了试，画面是越靠近越小，再改成far平面，画面是越靠近越大，但大的诡异
-        原因好解释，画一张图就能看出来，但是为何与预期不一样？
+        // 可是如上试了试，画面是越靠近越小，再改成far平面，画面是越靠近越大，但大的诡异
+        // 原因好解释，画一张图就能看出来，但是为何与预期不一样？
 
-        分析了一下，GAMES是要把视锥压缩为单位立方体，然后进行正交投影，是涉及到齐次坐标的
-        而目前手搓的版本不涉及到这些，仅仅从最直观的角度来做。
+        // 分析了一下，GAMES是要把视锥压缩为单位立方体，然后进行正交投影，是涉及到齐次坐标的
+        // 而目前手搓的版本不涉及到这些，仅仅从最直观的角度来做。
 
-        最后自然是想到了取0的时候，画一画会发现，在分布均匀的时候，的确是近的部分变大、远的部分变小，很符合直觉，实际效果也满足预期。
-        （不小心搞出来的这些鬼图，深入来说的话可能也代表了我们所期望的“0”平面？在其之前是会放大的，在其后是缩小的，也是不错的）解释。
+        // 最后自然是想到了取0的时候，画一画会发现，在分布均匀的时候，的确是近的部分变大、远的部分变小，很符合直觉，实际效果也满足预期。
+        // （不小心搞出来的这些鬼图，深入来说的话可能也代表了我们所期望的“0”平面？在其之前是会放大的，在其后是缩小的，也是不错的）解释。
 
-        还有一点不懂：为什么实例中把z也乘了这个系数？按理说现在应该啥都不变的。
-        */
+        // 还有一点不懂：为什么实例中把z也乘了这个系数？按理说现在应该啥都不变的。
+
         for (auto& iter : v)
         {
             // 这里不太好放到矩阵里，并且在当前情况下属于比较多余
@@ -81,11 +158,10 @@ void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot,
         auto p1 = v[iter.v1], p2 = v[iter.v2], p3 = v[iter.v3];
         auto w = buffer.width()/2;
 
-        /*
-        auto p1x = std::round((p1.x+1)*w); 
-        round命令返回double(float)，不管是在这里转int还是调入函数默认转换都有额外开销
-        使用lround命令，其返回long，能省去这一步，尽管在linux下long是64位，但开销也比float小
-        */
+        // auto p1x = std::round((p1.x+1)*w); 
+        // round命令返回double(float)，不管是在这里转int还是调入函数默认转换都有额外开销
+        // 使用lround命令，其返回long，能省去这一步，尽管在linux下long是64位，但开销也比float小
+
         drawTriangle(buffer, zbuffer,
                     {static_cast<int>(std::lround((p1.x+1)*w)), static_cast<int>(std::lround((p1.y+1)*w)), p1.z*z_muti+z_plus, getRandomColor()},
                     {static_cast<int>(std::lround((p2.x+1)*w)), static_cast<int>(std::lround((p2.y+1)*w)), p2.z*z_muti+z_plus, getRandomColor()},
@@ -94,6 +170,7 @@ void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate& rot,
     
     std::cout << "绘制完毕" << std::endl;
 }
+*/
 
 // 计算重心坐标，在原图与zbuffer上绘制三角形
 void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer,
@@ -243,31 +320,217 @@ getBbox(int ax, int ay, int bx, int by, int cx, int cy) // 获得BoundingBox，�
     return std::make_pair(lb_bbox, rt_bbox);
 }
 
-//std::tuple<mat3, mat3, mat3>
-mat3
-getRotMat(Rotate& rot)
+mat4
+getRotMat(double sinx, int axis)
 {
-    double sinx = std::sin(rot.x), cosx = std::cos(rot.x);
-    double siny = std::sin(rot.y), cosy = std::cos(rot.y);
-    double sinz = std::sin(rot.z), cosz = std::cos(rot.z);
-
-    mat3 xrotmat = {}, yrotmat = {}, zrotmat = {};
-
     // 旋转矩阵特点是绕谁转，谁就不会变，保留原来的值，因此能确定一行；同样的，其他维度旋转就与该轴无关，这样就确定一列
-    xrotmat(0, 0) = 1, xrotmat(0, 1) =    0, xrotmat(0, 2) =     0, 
-    xrotmat(1, 0) = 0, xrotmat(1, 1) = cosx, xrotmat(1, 2) = -sinx, 
-    xrotmat(2, 0) = 0, xrotmat(2, 1) = sinx, xrotmat(2, 2) =  cosx; 
 
-    yrotmat(0, 0) =  cosy, yrotmat(0, 1) = 0, yrotmat(0, 2) = siny, 
-    yrotmat(1, 0) =     0, yrotmat(1, 1) = 1, yrotmat(1, 2) =    0, 
-    yrotmat(2, 0) = -siny, yrotmat(2, 1) = 0, yrotmat(2, 2) = cosy; 
+    assert(axis >= 0 && axis <=2);  // 0为x轴，1为y轴，2为z轴
+    
+    //double cosx = std::cos(std::asin(sinx));  // 效率不如下面的三角恒等式
+    double cosx = std::sqrt(1.0 - sinx * sinx);
 
-    zrotmat(0, 0) = cosz, zrotmat(0, 1) = -sinz, zrotmat(0, 2) = 0, 
-    zrotmat(1, 0) = sinz, zrotmat(1, 1) =  cosz, zrotmat(1, 2) = 0, 
-    zrotmat(2, 0) =    0, zrotmat(2, 1) =     0, zrotmat(2, 2) = 1; 
+    mat4 rotmat = {};
 
-    // return {xrotmat, yrotmat, zrotmat};
-    return zrotmat*yrotmat*xrotmat; // 先x再y再z
+    switch (axis)
+    {
+        case 0:
+            rotmat(0, 0) =     1, /*        0        */ /*        0        */ /*        0        */
+            /*        0        */ rotmat(1, 1) =  cosx, rotmat(1, 2) = -sinx, /*        0        */
+            /*        0        */ rotmat(2, 1) =  sinx, rotmat(2, 2) =  cosx; /*        0        */
+            break;
+
+        case 1:
+            rotmat(0, 0) =  cosx, /*        0        */ rotmat(0, 2) =  sinx, /*        0        */
+            /*        0        */ rotmat(1, 1) =     1, /*        0        */ /*        0        */
+            rotmat(2, 0) = -sinx, /*        0        */ rotmat(2, 2) =  cosx; /*        0        */
+            break;
+
+        case 2:
+            rotmat(0, 0) =  cosx, rotmat(0, 1) = -sinx, /*        0        */ /*        0        */
+            rotmat(1, 0) =  sinx, rotmat(1, 1) =  cosx, /*        0        */ /*        0        */
+            /*        0        */ /*        0        */ rotmat(2, 2) =     1; /*        0        */
+            break;
+    }
+
+    rotmat(3, 3) = 1;
+
+    return rotmat;
+    
+    /*
+    xrotmat:                yrotmat:                zrotmat:
+        1,     0,      0,    cosy,     0,   siny,   cosz,  -sinz,      0, 
+        0,  cosx,  -sinx,       0,     1,      0,   sinz,   cosz,      0, 
+        0,  sinx,   cosx;   -siny,     0,   cosy;      0,      0,      1; 
+    */
+}
+
+mat4
+getPersp2OrthoMat(Frustum& fruInfo)
+{
+    if (fruInfo.perspective)
+    {
+        /*
+            根据相似三角形（cam - near - z）可得到x、y上的映射关系（相机坐标系）：
+            x'(y')= x(y) * n/z
+            但这时z也会变，未知，就要靠“近平面完全不变”与“远平面只有中点z不变”两个来构造、解方程
+
+            n   0   0   0
+            0   n   0   0
+            0   0 n+f -nf
+            0   0   1   0
+
+            */ 
+        mat4 persp2orthoMat;
+        persp2orthoMat(0, 0) = fruInfo.near;
+        persp2orthoMat(1, 1) = fruInfo.near;
+        persp2orthoMat(2, 2) = fruInfo.near + fruInfo.far;
+        persp2orthoMat(2, 3) = -fruInfo.near * fruInfo.far;
+        persp2orthoMat(3, 2) = 1;
+
+        return persp2orthoMat;
+    }
+
+    else    // 如果坚持正交则返回单位矩阵
+    {
+        return get1Mat();
+    }
+}
+
+mat4
+getOrthoMat(Frustum& fruInfo)
+{
+    mat4 moveBack = get1Mat();  // 把视长方体中心移动到坐标原点
+    moveBack(0, 3) = -0.5 * (fruInfo.left + fruInfo.right);
+    moveBack(1, 3) = -0.5 * (fruInfo.bottom + fruInfo.top);
+    moveBack(2, 3) = -0.5 * (fruInfo.near + fruInfo.far);
+
+    mat4 transMat;  // 从视长方体转换为[-1, 1]^3正立方体
+    transMat(0, 0) = 2 / (fruInfo.right - fruInfo.left);
+    transMat(1, 1) = 2 / (fruInfo.top - fruInfo.bottom);
+    transMat(2, 2) = 2 / (fruInfo.near - fruInfo.far);
+    transMat(3, 3) = 1;
+
+    mat4 OrthoMat = transMat * moveBack;    // 先平移回原点再变换
+    return OrthoMat;
+}
+
+mat4
+getModelMat(Model& modelInfo)
+{
+    /*
+        获取齐次坐标版模型变换矩阵，包括旋转与平移
+        实际计算时，等效为先平移回原点、再旋转、最后平移到目标处
+    */
+    mat4 ModelMat;
+    
+    // 先平移回原点
+    mat4 moveBack = get1Mat();
+    moveBack(0, 3) = -modelInfo.pos.x;
+    moveBack(1, 3) = -modelInfo.pos.y;
+    moveBack(2, 3) = -modelInfo.pos.z;
+
+    // 再旋转
+    double sinx = std::sin(modelInfo.x),
+           siny = std::sin(modelInfo.y),
+           sinz = std::sin(modelInfo.z);
+
+    mat4 xrotmat = getRotMat(sinx, 0), 
+         yrotmat = getRotMat(siny, 1),
+         zrotmat = getRotMat(sinz, 2);
+
+    mat4 rotmovMat = zrotmat*yrotmat*xrotmat;
+
+    // 计算完矩阵后，就可以认为已经执行了，只是还没有渲染
+    assert(modelInfo.shift.w == 0);   // 向量齐次坐标w为0
+    modelInfo.pos += modelInfo.shift;   // 更新坐标
+    modelInfo.shift = {0, 0, 0, 0};     // 清零shift
+
+    // 最后平移到目标
+    rotmovMat(0, 3) = modelInfo.pos.x,
+    rotmovMat(1, 3) = modelInfo.pos.y,
+    rotmovMat(2, 3) = modelInfo.pos.z;
+
+    ModelMat = rotmovMat * moveBack; // 先绕x再绕y后绕z
+
+    return ModelMat;
+}
+
+mat4
+getViewMat(Camera& camInfo)
+{
+    // 这里要做的其实是把世界坐标系与相机坐标系对齐，想想相机带着一堆东西，平移，旋转，和世界坐标系对齐
+    mat4 ViewMat;
+    mat4 shift = get1Mat(), rotate;
+
+    // 先获取平移回原点矩阵
+    shift(0, 3) = -camInfo.e.x;
+    shift(1, 3) = -camInfo.e.y;
+    shift(2, 3) = -camInfo.e.z;
+
+    /*
+        再获取摆正相机旋转矩阵，从“旋转矩阵其实就是基坐标变换”的角度比较好理解：
+        旋转矩阵的每一行都是目标坐标系的基向量在当前坐标系中的表示
+        比如单位矩阵之所以代表“1”，就是其做了一个从当前坐标系到当前坐标系的映射
+
+        而我们的g、t、gxt都是单位向量，可以直接代入
+    */
+    vec4 gxt = cross(camInfo.g, camInfo.t); // 单位向量，相互垂直，结果的模就还是1
+
+    rotate(0, 0) = gxt.x,       rotate(0, 1) = gxt.y,       rotate(0, 2) = gxt.z, 
+    rotate(1, 0) = camInfo.t.x, rotate(1, 1) = camInfo.t.y, rotate(1, 2) = camInfo.t.z, 
+    rotate(2, 0) =-camInfo.g.x, rotate(2, 1) =-camInfo.g.y, rotate(2, 2) =-camInfo.g.z, 
+    rotate(3, 3) = 1; 
+
+
+    ViewMat = rotate * shift; // 先移回原点，再旋转对齐，很直观
+
+    return ViewMat;
+}
+
+mat4
+getProjMat(Frustum& fruInfo)
+{
+    /*
+        投影变换还没懂的地方：
+        1.视锥按理来说是与cam同轴的，为何平移时的写法似乎是还考虑到视锥中心不在z轴上
+        2.视锥的可视角度是基于远平面定义的，从这个角度看，近平面似乎就是一个成像的平面，近平面的长宽就是起到裁切的作用
+          但是从这个角度看，用相机位置与近平面就完全能够得到最大可视角度的限制，此时若设定的可视角在此范围内可以理解为裁切已经成的像
+          但超过范围外（也就是定义的视锥比物理法则决定的视锥大）时，在两集合差集的物体从物理上看是不会成像的，但视锥压缩却能做到这一点。
+          这一块应该怎么处理。
+          看了下当时的笔记，fov最后还是由n与t定义，可依旧没有提出解决方法。
+          但是再观察变换式，其同样的也没有规定实际的far范围，那么似乎明白了卧槽！
+          near和far本身就只是规定了“最近/远能看到哪里”，然后加上一个最后的窗口范围，这样规定near的同时也隐性的划分好了视锥，
+          变换矩阵是对所有点变换的，原本在视锥外面的，变换后也仍是在视锥外面，不必担忧。
+          
+          牛逼！
+
+          可是相机位置怎么影响呢？view变换中已经做了这些！太严丝合缝了nb
+    */
+
+    /*
+        此时镜头已经对准想要看的东西，接下来把视锥里的投影即可
+        若采用透视投影，就是把视锥整个压缩为长方体
+        然后利用正交投影把长方体变换到单位立方体内
+    */
+    mat4 persp2orthoMat = getPersp2OrthoMat(fruInfo);
+    mat4 orthoMat = getOrthoMat(fruInfo);
+    mat4 ProjMat = orthoMat * persp2orthoMat; // 先把透视的视锥变换为正交的长方体，再缩放到[-1, 1]^3
+
+    return ProjMat;
+}
+
+mat4
+getViewportMat(const TGAImage& buffer)
+{
+    mat4 ViewportMat;
+    ViewportMat(0, 0) = buffer.width() / 2;
+    ViewportMat(0, 3) = buffer.width() / 2;
+    ViewportMat(1, 1) = buffer.height()/ 2;
+    ViewportMat(1, 3) = buffer.height()/ 2;
+    ViewportMat(2, 2) = 1;
+    ViewportMat(3, 3) = 1;
+    return ViewportMat;
 }
 /*
 此处原有绘制三角形中的探索性代码：自制扫描线渲染法、标准扫描线渲染法，可在lec2的commit记录中找到，以供回顾

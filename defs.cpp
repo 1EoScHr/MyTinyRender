@@ -4,6 +4,10 @@
 #include <iostream>
 #include <array>
 
+template<int m, int n> struct mat;
+template<> struct mat<3, 1>;
+template<> struct mat<4, 1>;
+
 // 创建一个n维向量，以模板结构体的形式
 template<int n> 
 struct vec 
@@ -12,6 +16,14 @@ struct vec
     std::array<double, n> data = {}; // 使用stl的数组结构，开销一致，但是更现代
     double& operator[](const int i)       { assert(i>=0 && i<n); return data[i]; }  // 操作符[]重载，加上断言防止意外访问
     double  operator[](const int i) const { assert(i>=0 && i<n); return data[i]; }  // 分别是针对引用和非引用，能规定是否可以修改值
+    vec<n>& operator+=(const vec<n>& other) // +=重载一般都在类内
+    {
+        for (int i = 0; i < n; i ++)
+        {
+            data[i] += other[i];
+        }
+        return *this;   // 返回当前对象的引用
+    }
 };
 
 template<int n> 
@@ -25,14 +37,10 @@ std::ostream& operator<<(std::ostream& out, const vec<n>& v)    // 操作符<<�
 }
 
 template<int n>
-vec<n> operator+(const vec<n>& a, const vec<n>& b)  // 重载+，参数const表示运行时不可更改，&表示不是拷贝，高效
+vec<n> operator+(vec<n> a, const vec<n>& b)  // 重载+，参数const表示运行时不可更改，&表示不是拷贝，高效
 {
-    vec<n> ret;
-    for (int i = 0; i < n; i ++)
-    {
-        ret[i] = a[i] + b[i];
-    }
-    return ret;
+    a += b;     // 这里的a是一个拷贝，不会修改原来的a；复用+=的逻辑
+    return a;
 }
 
 template<int n>
@@ -47,7 +55,7 @@ vec<n> operator-(const vec<n>& a, const vec<n>& b)  // 重载-
 }
 
 template<int n>
-double operator*(const vec<n>& a, const vec<n>& b)  // 重载*(点乘)），参数const表示运行时不可更改，&表示不是拷贝，高效
+double operator*(const vec<n>& a, const vec<n>& b)  // 重载*(点乘)，参数const表示运行时不可更改，&表示不是拷贝，高效
 {
     double ret = 0;
     for (int i = 0; i < n; i ++)
@@ -69,7 +77,7 @@ double operator*(const vec<n>& a, const vec<n>& b)  // 重载*(点乘)），参�
     并且还有一些一致性的设计，譬如虽然特化了vec3，但是其对外的接口依然一致，是[]，依然与其他一样通用。
 */
 
-template<int m, int n> struct mat;  // vec3中有从mat<3,1>构造来的定义，所以要把下面的mat提前放在这里声明
+// template<int m, int n> struct mat;  // vec3中有从mat<3,1>构造来的定义，所以要把下面的mat提前放在这里声明
 
 template<>
 struct vec<3>
@@ -77,10 +85,17 @@ struct vec<3>
     double x = 0, y = 0, z = 0; // 在这一特化版本中没有data[i]，而是x、y、z
     double& operator[](const int i)       { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }   // 保留[]接口，保持一致性
     double  operator[](const int i) const { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }
+    vec<3>& operator+=(const vec<3> other)
+    {
+        x += other.x;
+        y += other.y;
+        z += other.z;
+        return *this;
+    }
 
-    vec() = default;    // 首先增加默认构造函数
-    vec(double x, double y, double z);
-    vec(const mat<3, 1>& ma);   // 自定义从三行一列矩阵到三维向量的构造
+    vec() = default;                    // 默认构造函数，不传参数时默认选择
+    vec(double x, double y, double z);  // 自定义参数构造，这里只声明是因为mat还没有定义完
+    vec(const mat<3, 1>& ma);           // 自定义
     // vec<3>(const mat<3, 1>& ma): x(ma(0, 0)), y(ma(1, 0)), z(ma(2, 0)) { } // 这里注意不能这么写，模板要类名统一，同时这里放构造函数声明，因为mat还没有定义
 };
 
@@ -90,14 +105,33 @@ struct vec<2>
     double x = 0, y = 0;
     double& operator[](const int i)       { assert(i>=0 && i<2); return i ? y : x; }   // 保留[]接口，保持一致性
     double  operator[](const int i) const { assert(i>=0 && i<2); return i ? y : x; }
+    vec<2>& operator+=(const vec<2> other)
+    {
+        x += other.x;
+        y += other.y;
+        return *this;
+    }
 };
 
 template<>
 struct vec<4>
 {
     double x = 0, y = 0, z = 0, w = 0;
+    
     double& operator[](const int i)       { assert(i>=0 && i<4); return i ? (1==i ? y : (2==i ? z : w)) : x; }   // 保留[]接口，保持一致性
     double  operator[](const int i) const { assert(i>=0 && i<4); return i ? (1==i ? y : (2==i ? z : w)) : x; }
+    vec<4>& operator+=(const vec<4> other)
+    {
+        x += other.x;
+        y += other.y;
+        z += other.z;
+        w += other.w;
+        return *this;
+    }
+
+    vec() = default;
+    vec(double _x, double _y, double _z, double _w);
+    vec(const mat<4, 1>& ma);
 };
 
 typedef vec<2> vec2;
@@ -197,7 +231,7 @@ mat<n, m> trans(const mat<m, n>& ma)    // 矩阵求转置的一般写法
 }
 
 template<int n>
-void trans(mat<n, n>& ma)   // 针对方阵的转置实现
+void trans(mat<n, n>& ma)   // 针对方阵的转置实现，更高效
 {
     for (int i = 0; i < n; i++)
     {
@@ -245,17 +279,64 @@ struct mat<3, 1>
 
     mat() = default; // 默认构造函数，因为在矩阵乘法的实现中
     mat(const vec3& v): data{v.x, v.y, v.z} { } // vec<3>到mat<3,1>的转换
-
 };
+
+template<>
+struct mat<4, 1>
+{
+    std::array<double, 4> data = {};
+    double& operator()(const int i, const int j)       { assert(i>=0 && i<4 && j==0); return data[i]; }  // 不要写反成i*m+j了
+    double  operator()(const int i, const int j) const { assert(i>=0 && i<4 && j==0); return data[i]; }
+
+    mat() = default; // 默认构造函数
+    mat(const vec4& v): data{v.x, v.y, v.z, v.w} { } // vec<4>到mat<4,1>的转换
+};
+
 
 typedef mat<3, 3> mat3;
 typedef mat<4, 4> mat4;
 
+inline mat4
+get1Mat(void)   // 得到四阶单位矩阵
+{
+    mat4 ret;
+    ret(0, 0) = 1;
+    ret(1, 1) = 1;
+    ret(2, 2) = 1;
+    ret(3, 3) = 1;
+    return ret;
+}
+
+inline void 
+uintize(vec<4>& v)    // 规范化
+{
+    v.x /= v.w;
+    v.y /= v.w;
+    v.z /= v.w;
+    v.w = 1.0;
+}
+
+inline vec4 cross(vec4 v1, vec4 v2)    // 两向量叉乘
+{
+    /*
+        i    j    k
+     v1.x v1.y v1.z
+     v2.x v2.y v2.z
+    */
+    vec4 ret;
+    ret[0] = v1.y*v2.z - v1.z*v2.y;
+    ret[1] = v1.z*v2.x - v1.x*v2.z;
+    ret[3] = v1.x*v2.y - v1.y-v2.x;
+    return ret;
+}
+
 inline vec<3>::vec(double _x, double _y, double _z) : x(_x), y(_y), z(_z) { }   // mat<3,1>已经定义，补充构造函数定义
 inline vec<3>::vec(const mat<3,1>& ma) : x(ma(0,0)), y(ma(1,0)), z(ma(2,0)) { }
+inline vec<4>::vec(double _x, double _y, double _z, double _w) : x(_x), y(_y), z(_z), w(_w) { }
+inline vec<4>::vec(const mat<4,1>& ma) : x(ma(0,0)), y(ma(1,0)), z(ma(2,0)), w(ma(3,0)) { }
 
 template<int n>
-vec<n> operator*(const mat<n, n>& rot, const vec<n>& v)
+vec<n> operator*(const mat<n, n>& ma, const vec<n>& v)
 {
-    return static_cast<vec<n>>(rot * mat<n, 1>(v));
+    return static_cast<vec<n>>(ma * mat<n, 1>(v));
 }
