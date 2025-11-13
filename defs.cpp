@@ -308,12 +308,23 @@ get1Mat(void)   // 得到四阶单位矩阵
 }
 
 inline void 
-uintize(vec<4>& v)    // 规范化
+uintize(vec<4>& v)    // 齐次坐标规范化
 {
+    assert(v.w != 0);
     v.x /= v.w;
     v.y /= v.w;
     v.z /= v.w;
     v.w = 1.0;
+}
+
+inline void
+normalize(vec<4>& v)
+{
+    assert(v.w == 0);
+    double mod = std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+    v.x /= mod;
+    v.y /= mod;
+    v.z /= mod;
 }
 
 inline vec4 cross(vec4 v1, vec4 v2)    // 两向量叉乘

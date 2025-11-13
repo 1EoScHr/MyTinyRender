@@ -14,6 +14,7 @@ int main(int argc, char** argv) {
 
     std::string path1 = "../obj/diablo3_pose/diablo3_pose.obj";
     std::string path2 = "../obj/african_head/african_head.obj";
+    std::string path3 = "../obj/bunny/bunny.obj";
 
     drawOBJ(path2, framebuffer, zbuffer);
 

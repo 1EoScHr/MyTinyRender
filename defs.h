@@ -23,19 +23,32 @@ struct Pixel    // 这里原来是叫Point，但有vec3后，就得更具体，�
     // 构造函数
     Pixel(int _x, int _y, double _depth = 0, TGAColor _c = white)
         : x(_x), y(_y), depth(_depth), color(_c) {}
+    Pixel(vec4 screenPoint, TGAColor _c = white)
+        : color(_c) {   
+                this->x = static_cast<int>(std::lround(screenPoint.x)), 
+                this->y = static_cast<int>(std::lround(screenPoint.y)), 
+                this->depth = screenPoint.z;
+                }
 };
 
 struct Model    // 模型变换所用旋转、平移信息
 {
-    double x;   // 角度用弧度制
-    double y;
-    double z;
+    double x_rotate;   // 角度用弧度制
+    double y_rotate;
+    double z_rotate;
 
-    vec4 pos;   // 模型坐标系位置，默认是 0,0,0
-    vec4 shift; // 模型的位移，默认也是0
+    vec4 pos = {0, 0, 0, 1};   // 模型系坐标原点在世界坐标系的位置，默认是 0,0,0
+    vec4 shift = {0, 0, 0, 0}; // 模型的位移，默认也是0,0,0
 
-    Model(double _x = 0, double _y = 0, double _z = 0)
-        : x(_x), y(_y), z(_z) { this->pos.w = 1; }  // 位置是个坐标
+    ////////////////////////////////////////////////3DV小作业
+    vec4 x_axis = {1, 0, 0, 0}; // 模型坐标系，默认与世界坐标系对齐
+    vec4 y_axis = {0, 1, 0, 0};
+    vec4 z_axis = {0, 0, 1, 0};
+    ////////////////////////////////////////////////3DV小作业
+
+
+    Model(double _x_rotate = 0, double _y_rotate = 0, double _z_rotate = 0)
+        : x_rotate(_x_rotate), y_rotate(_y_rotate), z_rotate(_z_rotate) { }  // 位置是个坐标
 };
 
 struct Camera   // 视口变换所用相机信息

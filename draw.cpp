@@ -24,8 +24,6 @@ void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer)
     Camera camInfo;     // 默认参数
 
     /* TODO：这里后期添加模型相关处理逻辑
-    
-    
     */
 
     // 模型变换 Model
@@ -49,7 +47,7 @@ void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer)
     auto [zfar, znear] = std::ranges::minmax_element(v, {}, &vec4::z);
     Frustum fruInfo(M_PI/2, buffer.width()/static_cast<double>(buffer.height()), znear->z, zfar->z);   // 初始化视锥，可视角90度，宽高比与屏幕相关（不相关会让画面拉伸），使用near与far
 
-    /*  TODO：这里后期添加视锥处理逻辑
+    /*  TODO：这里后期添加视锥参数处理逻辑
     
     
     */
@@ -78,9 +76,45 @@ void drawOBJ(std::string path, TGAImage& buffer, TGAImage& zbuffer)
         drawTriangle(buffer, zbuffer,
                     {static_cast<int>(std::lround(p1.x)), static_cast<int>(std::lround(p1.y)), p1.z, getRandomColor()},
                     {static_cast<int>(std::lround(p2.x)), static_cast<int>(std::lround(p2.y)), p2.z, getRandomColor()},
-                    {static_cast<int>(std::lround(p3.x)), static_cast<int>(std::lround(p3.y)), p3.z, getRandomColor()});
+                    {static_cast<int>(std::lround(p3.x)), static_cast<int>(std::lround(p3.y)), p3.z, getRandomColor()}, 
+                    true);
     }
     
+    // 利用三角形绘制坐标轴
+    std::array<vec4, 6> origin;
+    origin[0] = {-0.05, 0, 0, 1}, origin[1] = {0.05, 0, 0, 1}, 
+    origin[2] = {0, -0.05, 0, 1}, origin[3] = {0, 0.05, 0, 1},
+    origin[4] = {0, 0, -0.05, 1}, origin[5] = {0, 0, 0.05, 1};
+    std::array<vec4, 3> end;
+    end[0] = {1.5, 0, 0, 1}, end[1] = {0, 1.5, 0, 1}, end[2] = {0, 0, 1.5, 1};
+    
+    for (auto& iter : origin)
+    {
+        iter = PV * viewMat * iter;
+        uintize(iter);
+    }
+    for (auto& iter : end)
+    {
+        iter = PV * viewMat * iter;
+        uintize(iter);
+    }
+    for (size_t i = 0; i < end.size(); i ++)
+    {
+    
+    drawTriangle(buffer, zbuffer, 
+                {origin[0], getRandomColor()}, 
+                {origin[1], getRandomColor()}, 
+                {end[i], getRandomColor()}, false);
+    drawTriangle(buffer, zbuffer, 
+                {origin[2], getRandomColor()}, 
+                {origin[3], getRandomColor()}, 
+                {end[i], getRandomColor()}, false);
+    drawTriangle(buffer, zbuffer, 
+                {origin[4], getRandomColor()}, 
+                {origin[5], getRandomColor()}, 
+                {end[i], getRandomColor()}, false);             
+    }
+
     std::cout << "绘制完毕" << std::endl;
 }
 
@@ -174,13 +208,16 @@ void drawOBJ_navie(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate
 
 // 计算重心坐标，在原图与zbuffer上绘制三角形
 void drawTriangle  (TGAImage& buffer, TGAImage& zbuffer,
-                    Pixel A, Pixel B, Pixel C)
+                    Pixel A, Pixel B, Pixel C, bool rmBack)
 {
     auto bbox = getBbox(A, B, C);
     double s_ABC = computeArea(A, B, C);
 
     // 背面剔除器，一种优化，原理见drawjusttriangle中的注释
-    if(std::signbit(s_ABC)) return;
+    if (rmBack)
+    {
+        if (std::signbit(s_ABC)) return;
+    }
 
     // 让编译器把紧跟其后的 for 循环并行化，在多核 CPU 上让不同线程分工执行循环迭代
     #pragma omp parallel for
@@ -321,14 +358,15 @@ getBbox(int ax, int ay, int bx, int by, int cx, int cy) // 获得BoundingBox，�
 }
 
 mat4
-getRotMat(double sinx, int axis)
+getRotMat(double x, int axis)
 {
     // 旋转矩阵特点是绕谁转，谁就不会变，保留原来的值，因此能确定一行；同样的，其他维度旋转就与该轴无关，这样就确定一列
 
     assert(axis >= 0 && axis <=2);  // 0为x轴，1为y轴，2为z轴
     
-    //double cosx = std::cos(std::asin(sinx));  // 效率不如下面的三角恒等式
-    double cosx = std::sqrt(1.0 - sinx * sinx);
+    double sinx = std::sin(x);
+    // double cosx = std::sqrt(1.0 - sinx * sinx);  // 三角恒等式，但会导致cos符号还需额外判断，不如直接用标准库
+    double cosx = std::cos(x);  
 
     mat4 rotmat = {};
 
@@ -430,14 +468,65 @@ getModelMat(Model& modelInfo)
     moveBack(1, 3) = -modelInfo.pos.y;
     moveBack(2, 3) = -modelInfo.pos.z;
 
-    // 再旋转
-    double sinx = std::sin(modelInfo.x),
-           siny = std::sin(modelInfo.y),
-           sinz = std::sin(modelInfo.z);
+    ////////////////////////////////////////////////3DV小作业
 
-    mat4 xrotmat = getRotMat(sinx, 0), 
-         yrotmat = getRotMat(siny, 1),
-         zrotmat = getRotMat(sinz, 2);
+    double angle;
+    std::cin >> angle;
+    modelInfo.z_rotate = angle / 180 * M_PI; // 绕对应轴转70度
+/**/
+    // 理解成模型坐标系不与世界坐标系平行，根据view变换的经验，可以增加以下步骤：
+    // 把模型平移回原点后，先旋转使模型坐标系与世界坐标系重合，再绕预设的各轴旋转，再旋转使模型坐标系恢复原来的值。
+    // 当然这里我简化实现，不追求模型坐标系完全与世界坐标系重合，只要两个的z轴能够重合，就绕z轴转。
+    // 所以这里只是进了一步来实现绕任意轴旋转，是从绕世界xyz轴旋转进步到经过模型原点任意一轴旋转，要再进一步变成任意一轴，可能还需要把模型坐标原点移动考虑进来
+
+    // 对于要求的(1, 1, 1)与70度情况
+
+    vec4 targetModelZaxis = {1, 1, 0, 0}; // 若与原轴重合，则就会引起断言错误，就不要闲的没事
+    normalize(targetModelZaxis);    // 目标z轴正则化向量值
+
+
+    // 默认的模型坐标系还和世界坐标系重合，要先让其变成设定的（同样为简化，只让z轴对齐，其他两轴跟着转就行）
+    // 我的思路是先绕世界z轴转，把模型z轴转到YOZ平面，再绕世界x轴把模型z轴转到世界z轴（当然也可反着，但这似乎就要顺时针）
+    // 复习一下“绕某轴转某度”：就是按右手定则，箭头对向眼睛、逆时针
+
+    // 这里选用的三角函数反解也有说法，为了精确的sin、cos符号，把求旋转矩阵的入参改成了弧度
+    // 第一步里，操作是把轴投影到在XOY平面上，所以其有可能分布在四个象限，用atan不精确，而atan2则接收x和y的值，刚好；
+    // 第二步里，已经把轴移到投影刚好在+y轴上，所以旋转角度只是0-pi，这时刚好用acos解算就没问题。
+    mat4 alignRotate1 = getRotMat(std::atan2(targetModelZaxis.y, targetModelZaxis.x), 2);   // 目标轴先绕z轴转到YOZ平面
+    mat4 alignRotate2 = getRotMat(std::acos(targetModelZaxis.z), 0);    // 目标轴再绕x轴转到z轴
+
+    // 逆旋转矩阵是旋转矩阵的转置
+    trans(alignRotate2);    // z轴转到ZOY面上
+    trans(alignRotate1);    // 继续转到目标z轴
+
+    // 模型坐标系的值
+    mat4 transTarget = alignRotate1 * alignRotate2;
+    assert(std::abs((transTarget * modelInfo.z_axis).z - targetModelZaxis.z) < 1e-6);
+    modelInfo.x_axis = transTarget * modelInfo.x_axis;
+    modelInfo.y_axis = transTarget * modelInfo.y_axis;
+    modelInfo.z_axis = transTarget * modelInfo.z_axis;
+    assert(std::abs(modelInfo.z_axis.x - targetModelZaxis.x) < 1e-6);
+
+    // 旋转矩阵的每一行，都是目标空间基向量在当前空间的表示
+    mat4 alignRotate;
+    alignRotate(0, 0) = modelInfo.x_axis.x, alignRotate(0, 1) = modelInfo.x_axis.y, alignRotate(0, 2) = modelInfo.x_axis.z, 
+    alignRotate(1, 0) = modelInfo.y_axis.x, alignRotate(1, 1) = modelInfo.y_axis.y, alignRotate(1, 2) = modelInfo.y_axis.z, 
+    alignRotate(2, 0) = modelInfo.z_axis.x, alignRotate(2, 1) = modelInfo.z_axis.y, alignRotate(2, 2) = modelInfo.z_axis.z, 
+    alignRotate(3, 3) = 1; 
+
+    // 反向变换回去
+    mat4 transAlignRotate = alignRotate;
+    trans(transAlignRotate);
+
+    assert(modelInfo.x_rotate == 0);
+    assert(modelInfo.y_rotate == 0);
+
+    ////////////////////////////////////////////////3DV小作业
+
+    // 再旋转
+    mat4 xrotmat = getRotMat(modelInfo.x_rotate, 0), 
+         yrotmat = getRotMat(modelInfo.y_rotate, 1),
+         zrotmat = getRotMat(modelInfo.z_rotate, 2);
 
     mat4 rotmovMat = zrotmat*yrotmat*xrotmat;
 
@@ -446,13 +535,29 @@ getModelMat(Model& modelInfo)
     modelInfo.pos += modelInfo.shift;   // 更新坐标
     modelInfo.shift = {0, 0, 0, 0};     // 清零shift
 
+    ////////////////////////////////////////////////3DV小作业
+/**/
+    mat4 movMat = get1Mat();
+    movMat(0, 3) = modelInfo.pos.x;
+    movMat(1, 3) = modelInfo.pos.y;
+    movMat(2, 3) = modelInfo.pos.z;
+
+    ModelMat = movMat * transAlignRotate * rotmovMat * alignRotate * moveBack; 
+    // 先移动回原点，再旋转使模型坐标系对应世界坐标系，此时再绕z轴旋转，再恢复原本的坐标系，再移动到目标地点
+
+    ////////////////////////////////////////////////3DV小作业
+
+    /*
+    
     // 最后平移到目标
     rotmovMat(0, 3) = modelInfo.pos.x,
     rotmovMat(1, 3) = modelInfo.pos.y,
-    rotmovMat(2, 3) = modelInfo.pos.z;
-
+    rotmovMat(2, 3) = modelInfo.pos.z;   
+    
     ModelMat = rotmovMat * moveBack; // 先绕x再绕y后绕z
 
+    */
+   
     return ModelMat;
 }
 
