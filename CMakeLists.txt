@@ -21,7 +21,16 @@ endif()
 
 find_package(OpenMP COMPONENTS CXX)
 
-set(SOURCES main.cpp tgaimage.cpp draw.cpp objreader.cpp)
+set(SOURCES 
+    src/main.cpp
+
+    src/basic/tgaimage.cpp 
+    
+    src/pipeline/rasterization.cpp
+    src/pipeline/vertex.cpp
+    
+    src/tools/objreader.cpp
+)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 target_link_libraries(${PROJECT_NAME} PRIVATE $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)

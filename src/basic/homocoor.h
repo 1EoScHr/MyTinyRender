@@ -1,14 +1,21 @@
+/*
+    homocoor.h
+    意为"homogeneous coordinate"，也就是齐次坐标
+    算是本项目的线性代数库
+*/
+
 #pragma once
 #include <cmath>
 #include <cassert>
 #include <iostream>
 #include <array>
 
+// 前向声明，在最后的矩阵x向量里，要实现3x1(4x1)矩阵与三维(四维)向量的转化，必须要选一个做前向声明
 template<int m, int n> struct mat;
 template<> struct mat<3, 1>;
 template<> struct mat<4, 1>;
 
-// 创建一个n维向量，以模板结构体的形式
+// n维向量模板
 template<int n> 
 struct vec 
 {
@@ -16,7 +23,7 @@ struct vec
     std::array<double, n> data = {}; // 使用stl的数组结构，开销一致，但是更现代
     double& operator[](const int i)       { assert(i>=0 && i<n); return data[i]; }  // 操作符[]重载，加上断言防止意外访问
     double  operator[](const int i) const { assert(i>=0 && i<n); return data[i]; }  // 分别是针对引用和非引用，能规定是否可以修改值
-    vec<n>& operator+=(const vec<n>& other) // +=重载一般都在类内
+    vec<n>& operator+=(const vec<n>& other) // +=重载一般都在类内，因为语义上是对类本身进行更改
     {
         for (int i = 0; i < n; i ++)
         {
@@ -26,6 +33,7 @@ struct vec
     }
 };
 
+// n维向量输出
 template<int n> 
 std::ostream& operator<<(std::ostream& out, const vec<n>& v)    // 操作符<<重载，向指定输出流输出n维向量的n个维度值
 {
@@ -36,6 +44,7 @@ std::ostream& operator<<(std::ostream& out, const vec<n>& v)    // 操作符<<�
     return out;
 }
 
+// n维向量加法
 template<int n>
 vec<n> operator+(vec<n> a, const vec<n>& b)  // 重载+，参数const表示运行时不可更改，&表示不是拷贝，高效
 {
@@ -43,6 +52,7 @@ vec<n> operator+(vec<n> a, const vec<n>& b)  // 重载+，参数const表示运�
     return a;
 }
 
+// n维向量减法
 template<int n>
 vec<n> operator-(const vec<n>& a, const vec<n>& b)  // 重载-
 {
@@ -54,6 +64,7 @@ vec<n> operator-(const vec<n>& a, const vec<n>& b)  // 重载-
     return ret;
 }
 
+// n维向量点乘
 template<int n>
 double operator*(const vec<n>& a, const vec<n>& b)  // 重载*(点乘)，参数const表示运行时不可更改，&表示不是拷贝，高效
 {
@@ -79,6 +90,7 @@ double operator*(const vec<n>& a, const vec<n>& b)  // 重载*(点乘)，参数c
 
 // template<int m, int n> struct mat;  // vec3中有从mat<3,1>构造来的定义，所以要把下面的mat提前放在这里声明
 
+// 特化：三维向量
 template<>
 struct vec<3>
 {
@@ -99,6 +111,7 @@ struct vec<3>
     // vec<3>(const mat<3, 1>& ma): x(ma(0, 0)), y(ma(1, 0)), z(ma(2, 0)) { } // 这里注意不能这么写，模板要类名统一，同时这里放构造函数声明，因为mat还没有定义
 };
 
+// 特化：二维向量
 template<>
 struct vec<2>
 {
@@ -113,6 +126,7 @@ struct vec<2>
     }
 };
 
+// 特化：四维向量
 template<>
 struct vec<4>
 {
@@ -140,6 +154,7 @@ typedef vec<4> vec4;
 
 // 以下是照猫画虎，实现一个简陋的矩阵
 
+// m*n矩阵模板
 template<int m, int n>
 struct mat
 {
@@ -151,6 +166,7 @@ struct mat
     mat() = default;
 };
 
+// 矩阵通用输出
 template<int m, int n>
 std::ostream& operator<<(std::ostream& out, const mat<m, n>& ma)
 {
@@ -165,6 +181,7 @@ std::ostream& operator<<(std::ostream& out, const mat<m, n>& ma)
     return out;
 }
 
+// 矩阵乘法实现
 template<int p, int q, int r>
 mat<p, r> operator*(const mat<p, q>& a, const mat<q, r>& b) // 矩阵乘法
 {
@@ -208,6 +225,7 @@ mat<p, r> operator*(const mat<p, q>& a, const mat<q, r>& b) // 矩阵乘法
     return ret;
 }
 
+// m*n矩阵转置
 template<int m, int n>
 mat<n, m> trans(const mat<m, n>& ma)    // 矩阵求转置的一般写法
 {
@@ -230,6 +248,7 @@ mat<n, m> trans(const mat<m, n>& ma)    // 矩阵求转置的一般写法
     return ret;
 }
 
+// 特化：方阵转置
 template<int n>
 void trans(mat<n, n>& ma)   // 针对方阵的转置实现，更高效
 {
@@ -243,6 +262,7 @@ void trans(mat<n, n>& ma)   // 针对方阵的转置实现，更高效
     return;
 }
 
+// 方阵求逆（未完成）
 template<int n>
 mat<n, n> reverse(const mat<n, n>& ma)
 {
@@ -250,6 +270,7 @@ mat<n, n> reverse(const mat<n, n>& ma)
     std::exit(EXIT_FAILURE);    // cpp与python不一样，退回传的是地址，而不是报错信息
 }
 
+// 特化：3x3矩阵求逆
 template<>
 inline mat<3, 3> reverse(const mat<3, 3>& ma)  // 针对3x3矩阵的专门求逆
 {
@@ -269,6 +290,7 @@ inline mat<3, 3> reverse(const mat<3, 3>& ma)  // 针对3x3矩阵的专门求逆
     return adj;
 }
 
+// 特化：3x1矩阵（也就是三维向量）
 template<>
 struct mat<3, 1>
 {
@@ -281,6 +303,7 @@ struct mat<3, 1>
     mat(const vec3& v): data{v.x, v.y, v.z} { } // vec<3>到mat<3,1>的转换
 };
 
+// 特化：4x1矩阵
 template<>
 struct mat<4, 1>
 {
@@ -292,10 +315,10 @@ struct mat<4, 1>
     mat(const vec4& v): data{v.x, v.y, v.z, v.w} { } // vec<4>到mat<4,1>的转换
 };
 
-
 typedef mat<3, 3> mat3;
 typedef mat<4, 4> mat4;
 
+// 内联：获取四维单位矩阵
 inline mat4
 get1Mat(void)   // 得到四阶单位矩阵
 {
@@ -307,6 +330,7 @@ get1Mat(void)   // 得到四阶单位矩阵
     return ret;
 }
 
+// 内联：齐次坐标规范化
 inline void 
 uintize(vec<4>& v)    // 齐次坐标规范化
 {
@@ -317,6 +341,7 @@ uintize(vec<4>& v)    // 齐次坐标规范化
     v.w = 1.0;
 }
 
+// 内联：向量归一化
 inline void
 normalize(vec<4>& v)
 {
@@ -327,6 +352,7 @@ normalize(vec<4>& v)
     v.z /= mod;
 }
 
+// 内联：四维齐次坐标向量叉乘（实际为三维）
 inline vec4 cross(vec4 v1, vec4 v2)    // 两向量叉乘
 {
     /*
@@ -341,11 +367,13 @@ inline vec4 cross(vec4 v1, vec4 v2)    // 两向量叉乘
     return ret;
 }
 
+// 补齐构造函数
 inline vec<3>::vec(double _x, double _y, double _z) : x(_x), y(_y), z(_z) { }   // mat<3,1>已经定义，补充构造函数定义
 inline vec<3>::vec(const mat<3,1>& ma) : x(ma(0,0)), y(ma(1,0)), z(ma(2,0)) { }
 inline vec<4>::vec(double _x, double _y, double _z, double _w) : x(_x), y(_y), z(_z), w(_w) { }
 inline vec<4>::vec(const mat<4,1>& ma) : x(ma(0,0)), y(ma(1,0)), z(ma(2,0)), w(ma(3,0)) { }
 
+// n维方阵与n维向量相乘
 template<int n>
 vec<n> operator*(const mat<n, n>& ma, const vec<n>& v)
 {
