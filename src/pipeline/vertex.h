@@ -21,8 +21,8 @@ public:
     void setRotate(double rad, int axis); // 改变某轴上的旋转角度
 
     const std::vector<vec4>& getVertex(void) const;
+    //std::vector<vec4> getVertexCopy(void);    // 不使用此方法，因为大对象栈上传参要多一次复制开销，直接用auto接const T&就能行
     const std::vector<face_obj>& getFace(void) const;
-    std::vector<vec4> getVertexCopy(void);
     bool getModelDirty(void) const;
 
     mat4 getModelMat(void);             // 获取模型变换矩阵

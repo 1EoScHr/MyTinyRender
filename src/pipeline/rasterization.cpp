@@ -4,12 +4,13 @@
 #include "rasterization.h"
 
 #include <math.h>
+#include <limits>
 #include <iostream>
 #include <algorithm>
 
-Rasterization::Rasterization(TGAImage& _buffer, TGAImage& _zbuffer, std::vector<vec4> v)
-    : buffer(_buffer), zbuffer(_zbuffer), 
-      v_copy(v), viewPortDirty(true), showAxis(false){}
+Rasterization::Rasterization(TGAImage& _buffer, const std::vector<vec4>& v)
+    : buffer(_buffer), v_copy(v), viewPortDirty(true), showAxis(false),
+      zbuffer(_buffer.width(), _buffer.height()) { }
 
 void 
 Rasterization::renderOBJ(Model& model, Camera& camera)
@@ -41,13 +42,24 @@ Rasterization::renderOBJ(Model& model, Camera& camera)
     viewPortMat = getViewPortMat();
 
     mat4 MVPV = viewPortMat * projMat * viewMat * modelMat;
-    for (auto& iter : v_copy)        // 再进行投影、视口变换，把东西先映射到[-1,1]^3，再到屏幕区域。
+    /*
+        // 下面这是cpp23引入的新特性，用zip结构化绑定，同步访问；但是现在用的debian12，没升级，用不了www
+        for (auto& [iter, rawiter] : std::ranges::views::zip(v_copy, model.getVertex())) // 再进行投影、视口变换，把东西先映射到[-1,1]^3，再到屏幕区域。
+        {
+            iter = MVPV * rawiter;
+            uintize(iter);
+        }
+    */
+    // 就用这个简陋手动方法 
+    const auto& v_raw = model.getVertex();
+    assert(v_copy.size() == v_raw.size() && "vertex's raw and copy not same size");
+    for (size_t i = 0; i < v_copy.size(); i ++)
     {
-        iter = MVPV * iter;
-        uintize(iter);
+        v_copy[i] = MVPV * v_raw[i];
+        uintize(v_copy[i]);
     }
 
-    for(auto& iter : f)
+    for (auto& iter : f)
     {
         auto p1 = v_copy[iter.v1], p2 = v_copy[iter.v2], p3 = v_copy[iter.v3];
        
@@ -61,6 +73,8 @@ Rasterization::renderOBJ(Model& model, Camera& camera)
                         {static_cast<int>(std::lround(p3.x)), static_cast<int>(std::lround(p3.y)), p3.z, getRandomColor()}
                         );
     }
+
+    if(showAxis) renderAxis();
 
     std::cout << "绘制完毕" << std::endl;
 }
@@ -76,6 +90,7 @@ Rasterization::renderTriangle(const Pixel& A, const Pixel& B, const Pixel& C)
     if (std::signbit(s_ABC)) return;
 
     auto bbox = getBbox(A, B, C);
+
     #pragma omp parallel for    // 让编译器把其后的for循环并行化，在多核CPU上让不同线程分工执行循环迭代
     for(auto px = bbox.first[0]; px < bbox.second[0]; px ++)
     {
@@ -90,16 +105,16 @@ Rasterization::renderTriangle(const Pixel& A, const Pixel& B, const Pixel& C)
             double beta  = s_PCA / s_ABC;
             double gamma = s_PAB / s_ABC;
 
-            // 判断是否在三角形内，根据符号位来判断
+            // 判断是否在三角形内，根据重心坐标符号位来判断
             //if(std::signbit(alpha) == std::signbit(beta) && std::signbit(beta) == std::signbit(gamma))
             if(std::signbit(alpha) || std::signbit(beta) || std::signbit(gamma))
                 continue;
 
-            // z-buffer更新，这里是基于灰度图的方式，感觉还能再优化？
+            // z-buffer更新
             double d = alpha*A.depth + beta*B.depth + gamma*C.depth; // 计算当前点深度
-            if(d < zbuffer.getdepth(px, py)) continue; // 如果比现有更深，则不画，注意z越小、depth越小、越在后
-            auto g = static_cast<std::uint8_t>(127.5*(d+1)); // 从[-1, 1]映射到[0, 255]
-            zbuffer.set(px, py, {g});
+            if(d <= zbuffer(px, py)) continue; // 如果比现有更深，则不画，注意z越小、depth越小、越在后
+            // auto g = static_cast<std::uint8_t>(127.5*((d>1?:d)+1)); // 从[-1, 1]映射到[0, 255]
+            zbuffer(px, py) = d;
             
             // 填充正经buffer
             buffer.set(px, py, 
@@ -140,9 +155,9 @@ Rasterization::renderTriangle_noJudge(const Pixel& A, const Pixel& B, const Pixe
 
             // z-buffer更新，这里是基于灰度图的方式，感觉还能再优化？
             double d = alpha*A.depth + beta*B.depth + gamma*C.depth; // 计算当前点深度
-            if(d < zbuffer.getdepth(px, py)) continue; // 如果比现有更深，则不画，注意z越小、depth越小、越在后
-            auto g = static_cast<std::uint8_t>(127.5*(d+1)); // 从[-1, 1]映射到[0, 255]
-            zbuffer.set(px, py, {g});
+            if(d <= zbuffer(px, py)) continue; // 如果比现有更深，则不画，注意z越小、depth越小、越在后
+            //auto g = static_cast<std::uint8_t>(127.5*(d+1)); // 从[-1, 1]映射到[0, 255]
+            zbuffer(px, py) = d;
             
             // 填充正经buffer
             buffer.set(px, py, 
@@ -152,6 +167,13 @@ Rasterization::renderTriangle_noJudge(const Pixel& A, const Pixel& B, const Pixe
                 static_cast<std::uint8_t>(alpha*A.color[3]+beta*B.color[3]+gamma*C.color[3])});
         }
     }
+}
+
+void 
+Rasterization::setAxis(bool axis)
+{
+    this->showAxis = axis;
+    return;
 }
 
 void
@@ -209,11 +231,11 @@ Rasterization::getViewPortMat()
     return ViewportMat;
 }
 
-// Pixel封装版本
+// 获取三角形的包围盒，Pixel封装版本
 std::pair<std::vector<int>, std::vector<int>>
 Rasterization::getBbox(const Pixel& a, const Pixel& b, const Pixel& c) // 获得BoundingBox
 {
-    std::vector<int> lb_bbox, rt_bbox;
+    std::vector<int> lb_bbox, rt_bbox;  // left back和right top
     
     auto mm = std::minmax({a.x, b.x, c.x});
     lb_bbox.emplace_back(mm.first);

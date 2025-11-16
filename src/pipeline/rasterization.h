@@ -16,11 +16,13 @@ class Rasterization
 {
 public:
     void renderOBJ(Model& model, Camera& camera);
+    void setAxis(bool axis);
     
-    Rasterization(TGAImage& _buffer, TGAImage& _zbuffer, std::vector<vec4> v);
+    Rasterization(TGAImage& _buffer, const std::vector<vec4>& v);
 
 private:
-    TGAImage buffer, zbuffer;
+    TGAImage& buffer;
+    ZBuffer zbuffer; // zbuffer只要能够体现出相对深度，double精度过剩
     mat4 modelMat, viewMat, projMat, viewPortMat;
 
     std::vector<vec4> v_copy;
@@ -34,6 +36,30 @@ private:
 
     bool showAxis;
     void renderAxis();
+};
+
+struct ZBuffer
+{
+    std::vector<float> depth;
+    
+    int width;
+    int height;
+
+    // i是行索引(y)，j是列索引(x)，这是反的!
+    float& operator()(const int i, const int j)       { assert(i>=0 && i<height && j>=0 && j<width); return depth[j + i*width];}
+    float  operator()(const int i, const int j) const { assert(i>=0 && i<height && j>=0 && j<width); return depth[j + i*width];}
+
+    ZBuffer(int _width, int _height)
+        : width(_width), height(_height)
+    {
+        /*
+            FLT_MAX是float能表示的最大值，那么加个负号就是最小值
+            // zbuffer.resize(buffer.width()*buffer.height(), -__FLT_MAX__);
+            可是cpp不推荐这样，因为宏会污染作用域，
+            使用std::numeric_limits<float>类型安全，还支持模板
+        */
+        depth.resize(width*height, std::numeric_limits<float>::min());  // 让深度缓冲默认最远(值最小)
+    }
 };
 
 // 计算三像素围成的有向面积

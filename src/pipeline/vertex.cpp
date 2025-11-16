@@ -13,16 +13,15 @@ Model::getVertex(void) const
     return this->v;
 }
 
-std::vector<vec4> 
-Model::getVertexCopy(void)
-{
-    return this->v;
-}
-
 const std::vector<face_obj>& 
 Model::getFace(void) const
 {
     return this->f;
+}
+
+bool Model::getModelDirty(void) const
+{
+    return this->modelDirty;
 }
 
 void 
@@ -130,8 +129,8 @@ Camera::setAspect(double newAspect)
 }
 
 Camera::Camera(double _aspect)
-    : e({0, 0, 2, 1}), g({0, 0, -1, 0}), t({0, 1, 0, 0}), shift({0, 0, 0, 0}),
-    fov(M_PI / 2.), aspect(_aspect), near(0.1), far(0.9), viewDirty(true), projDirty(true)
+    : e({0, 0, 2., 1}), g({0, 0, -1, 0}), t({0, 1, 0, 0}), shift({0, 0, 0, 0}),
+    fov(M_PI / 2.), aspect(_aspect), near(-1), far(-100), viewDirty(true), projDirty(true)
 {
     double hdiv2 = std::abs(near) * std::tan(fov/2);    // 几何关系推导
     this->top = hdiv2;
