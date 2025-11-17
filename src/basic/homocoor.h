@@ -94,7 +94,7 @@ double operator*(const vec<n>& a, const vec<n>& b)  // 重载*(点乘)，参数c
 template<>
 struct vec<3>
 {
-    double x = 0, y = 0, z = 0; // 在这一特化版本中没有data[i]，而是x、y、z
+    double x, y, z; // 在这一特化版本中没有data[i]，而是x、y、z
     double& operator[](const int i)       { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }   // 保留[]接口，保持一致性
     double  operator[](const int i) const { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }
     vec<3>& operator+=(const vec<3> other)
@@ -130,7 +130,7 @@ struct vec<2>
 template<>
 struct vec<4>
 {
-    double x = 0, y = 0, z = 0, w = 0;
+    double x, y, z, w;
     
     double& operator[](const int i)       { assert(i>=0 && i<4); return i ? (1==i ? y : (2==i ? z : w)) : x; }   // 保留[]接口，保持一致性
     double  operator[](const int i) const { assert(i>=0 && i<4); return i ? (1==i ? y : (2==i ? z : w)) : x; }
@@ -151,6 +151,19 @@ struct vec<4>
 typedef vec<2> vec2;
 typedef vec<3> vec3;
 typedef vec<4> vec4;
+
+// 深度缓冲使用，z退化为够用的float
+struct vec4_zf
+{
+    double x, y;
+    float z;
+    double w;
+
+    vec4_zf() = default;    // 在zbuffer的初始化里，调用了resize，其需要用默认构造函数
+    vec4_zf(vec4 v) : x(v.x), y(v.y), z(static_cast<float>(v.z)), w(v.w) { }    // 构造实现要与声明一致
+    // 用到的时候都是来接一个mat<4,1>的，如果不加一个直接的转换接口，就会多一次开销
+    vec4_zf(const mat<4, 1>& ma);
+};
 
 // 以下是照猫画虎，实现一个简陋的矩阵
 
@@ -341,6 +354,16 @@ uintize(vec<4>& v)    // 齐次坐标规范化
     v.w = 1.0;
 }
 
+inline void 
+uintize(vec4_zf& v)    // 齐次坐标规范化
+{
+    assert(v.w != 0);
+    v.x /= v.w;
+    v.y /= v.w;
+    v.z /= static_cast<float>(v.w);
+    v.w = 1.0;
+}
+
 // 内联：向量归一化
 inline void
 normalize(vec<4>& v)
@@ -370,8 +393,11 @@ inline vec4 cross(vec4 v1, vec4 v2)    // 两向量叉乘
 // 补齐构造函数
 inline vec<3>::vec(double _x, double _y, double _z) : x(_x), y(_y), z(_z) { }   // mat<3,1>已经定义，补充构造函数定义
 inline vec<3>::vec(const mat<3,1>& ma) : x(ma(0,0)), y(ma(1,0)), z(ma(2,0)) { }
+
 inline vec<4>::vec(double _x, double _y, double _z, double _w) : x(_x), y(_y), z(_z), w(_w) { }
 inline vec<4>::vec(const mat<4,1>& ma) : x(ma(0,0)), y(ma(1,0)), z(ma(2,0)), w(ma(3,0)) { }
+
+inline vec4_zf::vec4_zf(const mat<4,1>& ma) : x(ma(0,0)), y(ma(1,0)), z(static_cast<float>(ma(2,0))), w(ma(3,0)) { }
 
 // n维方阵与n维向量相乘
 template<int n>

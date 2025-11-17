@@ -130,7 +130,8 @@ Camera::setAspect(double newAspect)
 
 Camera::Camera(double _aspect)
     : e({0, 0, 2., 1}), g({0, 0, -1, 0}), t({0, 1, 0, 0}), shift({0, 0, 0, 0}),
-    fov(M_PI / 2.), aspect(_aspect), near(-1), far(-100), viewDirty(true), projDirty(true)
+    fov(M_PI / 2.), aspect(_aspect), near(-1), far(-100), perspective(true),
+    viewDirty(true), projDirty(true)
 {
     double hdiv2 = std::abs(near) * std::tan(fov/2);    // 几何关系推导
     this->top = hdiv2;

@@ -23,7 +23,7 @@ struct Pixel    // 这里原来是叫Point，但有vec3后，就得更具体，�
 {
     int x;
     int y;
-    double depth; // 把[far, near]的z缩放为[-1, 1]的深度
+    float depth;
     TGAColor color;
 
     // 构造函数

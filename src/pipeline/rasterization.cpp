@@ -9,8 +9,11 @@
 #include <algorithm>
 
 Rasterization::Rasterization(TGAImage& _buffer, const std::vector<vec4>& v)
-    : buffer(_buffer), v_copy(v), viewPortDirty(true), showAxis(false),
-      zbuffer(_buffer.width(), _buffer.height()) { }
+    : buffer(_buffer), zbuffer(_buffer.width(), _buffer.height()),
+      viewPortDirty(true), showAxis(false), showZbuffer(false)
+{
+    v_copy.resize(v.size());   // 让rasterization里面的vertex副本与原值一致
+}
 
 void 
 Rasterization::renderOBJ(Model& model, Camera& camera)
@@ -74,8 +77,6 @@ Rasterization::renderOBJ(Model& model, Camera& camera)
                         );
     }
 
-    if(showAxis) renderAxis();
-
     std::cout << "绘制完毕" << std::endl;
 }
 
@@ -83,27 +84,27 @@ Rasterization::renderOBJ(Model& model, Camera& camera)
 void 
 Rasterization::renderTriangle(const Pixel& A, const Pixel& B, const Pixel& C)
 {
-    
-    double s_ABC = computeArea(A, B, C);
+    // 首先通过bbox判断是否在屏幕内，不在屏幕直接跳过
+    auto [lb, rt] = getBbox(A, B, C);
+    if (lb.first > rt.first || lb.second > rt.second) return;
 
-    // 背面剔除器，一种优化，原理见drawjusttriangle中的注释
+    // 然后利用有向面积背面剔除器，一种优化，原理见历史commit的drawjusttriangle中的注释
+    float s_ABC = computeArea(A, B, C);
     if (std::signbit(s_ABC)) return;
-
-    auto bbox = getBbox(A, B, C);
-
+    
     #pragma omp parallel for    // 让编译器把其后的for循环并行化，在多核CPU上让不同线程分工执行循环迭代
-    for(auto px = bbox.first[0]; px < bbox.second[0]; px ++)
+    for(auto px = lb.first; px <= rt.first; px ++)
     {
-        for(auto py = bbox.first[1]; py < bbox.second[1]; py ++)
-        {
-            // 计算重心坐标
-            double s_PBC = computeArea(Pixel{px,py}, B, C);
-            double s_PCA = computeArea(Pixel{px,py}, C, A);
-            double s_PAB = computeArea(Pixel{px,py}, A, B);
+        for(auto py = lb.second; py <= rt.second; py ++)
+        {    
+            // 计算重心坐标，用float足够
+            float s_PBC = computeArea(Pixel{px,py}, B, C);
+            float s_PCA = computeArea(Pixel{px,py}, C, A);
+            float s_PAB = computeArea(Pixel{px,py}, A, B);
 
-            double alpha = s_PBC / s_ABC;
-            double beta  = s_PCA / s_ABC;
-            double gamma = s_PAB / s_ABC;
+            float alpha = s_PBC / s_ABC;
+            float beta  = s_PCA / s_ABC;
+            float gamma = s_PAB / s_ABC;
 
             // 判断是否在三角形内，根据重心坐标符号位来判断
             //if(std::signbit(alpha) == std::signbit(beta) && std::signbit(beta) == std::signbit(gamma))
@@ -111,7 +112,8 @@ Rasterization::renderTriangle(const Pixel& A, const Pixel& B, const Pixel& C)
                 continue;
 
             // z-buffer更新
-            double d = alpha*A.depth + beta*B.depth + gamma*C.depth; // 计算当前点深度
+            float d = (alpha*A.depth + beta*B.depth + gamma*C.depth); // 计算当前点深度
+
             if(d <= zbuffer(px, py)) continue; // 如果比现有更深，则不画，注意z越小、depth越小、越在后
             // auto g = static_cast<std::uint8_t>(127.5*((d>1?:d)+1)); // 从[-1, 1]映射到[0, 255]
             zbuffer(px, py) = d;
@@ -130,31 +132,33 @@ Rasterization::renderTriangle(const Pixel& A, const Pixel& B, const Pixel& C)
 void 
 Rasterization::renderTriangle_noJudge(const Pixel& A, const Pixel& B, const Pixel& C)
 {
-    auto bbox = getBbox(A, B, C);
-    double s_ABC = computeArea(A, B, C);
+    auto [lb, rt] = getBbox(A, B, C);
+    if (lb.first > rt.first || lb.second > rt.second) return;
 
+    float s_ABC = computeArea(A, B, C);
+    
     // 让编译器把紧跟其后的 for 循环并行化，在多核 CPU 上让不同线程分工执行循环迭代
     #pragma omp parallel for
-    for(auto px = bbox.first[0]; px < bbox.second[0]; px ++)
+    for(auto px = lb.first; px < rt.first; px ++)
     {
-        for(auto py = bbox.first[1]; py < bbox.second[1]; py ++)
+        for(auto py = lb.second; py < rt.second; py ++)
         {
             // 计算重心坐标
-            double s_PBC = computeArea(Pixel{px,py}, B, C);
-            double s_PCA = computeArea(Pixel{px,py}, C, A);
-            double s_PAB = computeArea(Pixel{px,py}, A, B);
+            float s_PBC = computeArea(Pixel{px,py}, B, C);
+            float s_PCA = computeArea(Pixel{px,py}, C, A);
+            float s_PAB = computeArea(Pixel{px,py}, A, B);
 
-            double alpha = s_PBC / s_ABC;
-            double beta  = s_PCA / s_ABC;
-            double gamma = s_PAB / s_ABC;
+            float alpha = s_PBC / s_ABC;
+            float beta  = s_PCA / s_ABC;
+            float gamma = s_PAB / s_ABC;
 
             // 判断是否在三角形内，根据符号位来判断
             //if(std::signbit(alpha) == std::signbit(beta) && std::signbit(beta) == std::signbit(gamma))
             if(std::signbit(alpha) || std::signbit(beta) || std::signbit(gamma))
                 continue;
 
-            // z-buffer更新，这里是基于灰度图的方式，感觉还能再优化？
-            double d = alpha*A.depth + beta*B.depth + gamma*C.depth; // 计算当前点深度
+            // z-buffer更新
+            float d = alpha*A.depth + beta*B.depth + gamma*C.depth; // 计算当前点深度
             if(d <= zbuffer(px, py)) continue; // 如果比现有更深，则不画，注意z越小、depth越小、越在后
             //auto g = static_cast<std::uint8_t>(127.5*(d+1)); // 从[-1, 1]映射到[0, 255]
             zbuffer(px, py) = d;
@@ -169,10 +173,26 @@ Rasterization::renderTriangle_noJudge(const Pixel& A, const Pixel& B, const Pixe
     }
 }
 
+void
+Rasterization::cheese()
+{
+    if (showAxis) renderAxis();
+    buffer.write_tga_file("framebuffer.tga");
+
+    if (showZbuffer) exit(EXIT_FAILURE);    // TODO: zbuffer2tga
+}
+
 void 
 Rasterization::setAxis(bool axis)
 {
     this->showAxis = axis;
+    return;
+}
+
+void 
+Rasterization::setShowZb(bool showzb)
+{
+    this->showZbuffer = showzb;
     return;
 }
 
@@ -231,19 +251,15 @@ Rasterization::getViewPortMat()
     return ViewportMat;
 }
 
-// 获取三角形的包围盒，Pixel封装版本
-std::pair<std::vector<int>, std::vector<int>>
-Rasterization::getBbox(const Pixel& a, const Pixel& b, const Pixel& c) // 获得BoundingBox
+// 获取三角形的包围盒，Pixel封装版本，使用结构化绑定比较高效
+std::pair<std::pair<int, int>, std::pair<int, int>>
+Rasterization::getBbox(const Pixel& A, const Pixel& B, const Pixel& C) // 获得BoundingBox
 {
-    std::vector<int> lb_bbox, rt_bbox;  // left back和right top
+    // left back和right top
+    auto [l, r] = std::minmax({A.x, B.x, C.x});
+    auto [b, t] = std::minmax({A.y, B.y, C.y});
     
-    auto mm = std::minmax({a.x, b.x, c.x});
-    lb_bbox.emplace_back(mm.first);
-    rt_bbox.emplace_back(mm.second);
-
-    mm = std::minmax({a.y, b.y, c.y});
-    lb_bbox.emplace_back(mm.first);
-    rt_bbox.emplace_back(mm.second);
-    
-    return std::make_pair(lb_bbox, rt_bbox);
+    // 加一个限制，防止bbox越界，进行裁剪
+    return std::make_pair(std::make_pair(std::max(l, 0), std::max(b, 0)),
+                          std::make_pair(std::min(r, buffer.width()-1), std::min(t, buffer.height()-1)));
 }

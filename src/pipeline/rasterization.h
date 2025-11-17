@@ -12,32 +12,6 @@
 
 #include <iostream>
 
-class Rasterization 
-{
-public:
-    void renderOBJ(Model& model, Camera& camera);
-    void setAxis(bool axis);
-    
-    Rasterization(TGAImage& _buffer, const std::vector<vec4>& v);
-
-private:
-    TGAImage& buffer;
-    ZBuffer zbuffer; // zbuffer只要能够体现出相对深度，double精度过剩
-    mat4 modelMat, viewMat, projMat, viewPortMat;
-
-    std::vector<vec4> v_copy;
-    
-    bool viewPortDirty;
-    mat4 getViewPortMat();
-
-    std::pair<std::vector<int>, std::vector<int>> getBbox(const Pixel& a, const Pixel& b, const Pixel& c); // Pixel封装，获取三角形包围框
-    void renderTriangle(const Pixel& a, const Pixel& b, const Pixel& c);
-    void renderTriangle_noJudge(const Pixel& a, const Pixel& b, const Pixel& c);
-
-    bool showAxis;
-    void renderAxis();
-};
-
 struct ZBuffer
 {
     std::vector<float> depth;
@@ -46,8 +20,8 @@ struct ZBuffer
     int height;
 
     // i是行索引(y)，j是列索引(x)，这是反的!
-    float& operator()(const int i, const int j)       { assert(i>=0 && i<height && j>=0 && j<width); return depth[j + i*width];}
-    float  operator()(const int i, const int j) const { assert(i>=0 && i<height && j>=0 && j<width); return depth[j + i*width];}
+    float& operator()(const int x, const int y)       { assert(x>=0 && x<width && y>=0 && y<height); return depth[x + y*width];}
+    float  operator()(const int x, const int y) const { assert(x>=0 && x<width && y>=0 && y<height); return depth[x + y*width];}
 
     ZBuffer(int _width, int _height)
         : width(_width), height(_height)
@@ -58,13 +32,43 @@ struct ZBuffer
             可是cpp不推荐这样，因为宏会污染作用域，
             使用std::numeric_limits<float>类型安全，还支持模板
         */
-        depth.resize(width*height, std::numeric_limits<float>::min());  // 让深度缓冲默认最远(值最小)
+        depth.resize(width*height, std::numeric_limits<float>::lowest());  // 让深度缓冲默认最远(值最小)
     }
+};
+
+class Rasterization 
+{
+public:
+    void renderOBJ(Model& model, Camera& camera);
+    void cheese();  // 最终的转出句柄
+
+    void setAxis(bool axis);
+    void setShowZb(bool showzb);
+    
+    Rasterization(TGAImage& _buffer, const std::vector<vec4>& v);
+
+private:
+    TGAImage& buffer;
+    ZBuffer zbuffer; // zbuffer只要能够体现出相对深度，double精度过剩
+    mat4 modelMat, viewMat, projMat, viewPortMat;
+
+    std::vector<vec4_zf> v_copy;
+    
+    bool viewPortDirty;
+    mat4 getViewPortMat();
+    bool showAxis;
+    bool showZbuffer;
+
+    std::pair<std::pair<int, int>, std::pair<int, int>> getBbox(const Pixel& a, const Pixel& b, const Pixel& c); // Pixel封装，获取三角形包围框
+    void renderTriangle(const Pixel& a, const Pixel& b, const Pixel& c);
+    void renderTriangle_noJudge(const Pixel& a, const Pixel& b, const Pixel& c);
+    void zbuffer2tga();
+    void renderAxis();
 };
 
 // 计算三像素围成的有向面积
 inline
-double computeArea(const Pixel& a, const Pixel& b, const Pixel& c)
+float computeArea(const Pixel& a, const Pixel& b, const Pixel& c)
 {
     /*
         三角形共面任意一点都可以用三角形的重心坐标来表示，并且任意一值小于0就能判定这一点位于三角形外
@@ -76,5 +80,5 @@ double computeArea(const Pixel& a, const Pixel& b, const Pixel& c)
         所以用二维向量叉积u✖v就可以求出三角形的有向面积，其等价于二维标量(u_x*v_y - u_y*v_x)，
         其中，u=ab=(bx-ax, by-ay), v=ac=(cx-ax, cy-ay)。
     */
-    return (a.x*(b.y-c.y) + b.x*(c.y-a.y) + c.x*(a.y-b.y)) / 2.0; 
+    return (a.x*(b.y-c.y) + b.x*(c.y-a.y) + c.x*(a.y-b.y)) / 2.0f; 
 }

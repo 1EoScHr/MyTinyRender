@@ -16,7 +16,6 @@ int main(int argc, char** argv) {
     // TODO: ZBuffer -> TGAImage(GRAYSCALE)
     // //                             // //
     //                                   //
-    
     // TGAImage zbuffer(width, height, TGAImage::GRAYSCALE); // 才发现这里可以直接用灰度图类型，前面都自作聪明用RGB :(
 
     std::string path1 = "../resource/obj/diablo3_pose/diablo3_pose.obj";
@@ -27,15 +26,14 @@ int main(int argc, char** argv) {
     Camera camera(width/height);
     Rasterization raster(framebuffer, model.getVertex());
 
-    model.setRotate(M_PI / 2, 2);
-    camera.addShift({0, 0, -0.1, 0});
+    model.setRotate(M_PI, 1);
+    // camera.addShift({0, 0, 3, 0});
     
     //raster.setAxis(true);
 
     raster.renderOBJ(model, camera);
 
-    framebuffer.write_tga_file("framebuffer.tga");
-    // zbuffer.write_tga_file("zbuffer.tga");
+    raster.cheese();
 
     return 0;
 }
