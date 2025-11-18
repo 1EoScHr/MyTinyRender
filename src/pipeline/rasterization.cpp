@@ -5,11 +5,12 @@
 
 #include <math.h>
 #include <limits>
+#include <ranges>
 #include <iostream>
 #include <algorithm>
 
 Rasterization::Rasterization(TGAImage& _buffer, const std::vector<vec4>& v)
-    : buffer(_buffer), zbuffer(_buffer.width(), _buffer.height()),
+    : buffer(_buffer), depthbuffer(nullptr), zbuffer(_buffer.width(), _buffer.height()), 
       viewPortDirty(true), showAxis(false), showZbuffer(false)
 {
     v_copy.resize(v.size());   // 让rasterization里面的vertex副本与原值一致
@@ -28,17 +29,6 @@ Rasterization::renderOBJ(Model& model, Camera& camera)
     modelMat = model.getModelMat();
     // 视图变换 view/Camera
     viewMat = camera.getViewMat();
-
-    // 以下是之前基于错误理解实现的，已经不再需要，但是有一点学习意义。
-    /*
-        // 获取z坐标的最大值与最小值，界定near与far，辅助进行透视
-        这个写法是C++20风味的，简洁优美，但得加配置文件让vscode支持cpp20语法
-        &vec4::z是投影参数，让编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
-        返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出
-        // auto [zfar, znear] = std::ranges::minmax_element(v, {}, &vec4::z);
-        // Frustum fruInfo(M_PI/2, buffer.width()/static_cast<double>(buffer.height()), znear->z, zfar->z);   // 初始化视锥，可视角90度，宽高比与屏幕相关（不相关会让画面拉伸），使用near与far
-    */
-
     // 投影变换 Projection
     projMat = camera.getProjMat();
     // 视口变换 Viewport
@@ -73,11 +63,8 @@ Rasterization::renderOBJ(Model& model, Camera& camera)
         */
         renderTriangle( {static_cast<int>(std::lround(p1.x)), static_cast<int>(std::lround(p1.y)), p1.z, getRandomColor()},
                         {static_cast<int>(std::lround(p2.x)), static_cast<int>(std::lround(p2.y)), p2.z, getRandomColor()},
-                        {static_cast<int>(std::lround(p3.x)), static_cast<int>(std::lround(p3.y)), p3.z, getRandomColor()}
-                        );
+                        {static_cast<int>(std::lround(p3.x)), static_cast<int>(std::lround(p3.y)), p3.z, getRandomColor()});
     }
-
-    std::cout << "绘制完毕" << std::endl;
 }
 
 // 计算重心坐标，在原图与zbuffer上绘制三角形
@@ -114,8 +101,11 @@ Rasterization::renderTriangle(const Pixel& A, const Pixel& B, const Pixel& C)
             // z-buffer更新
             float d = (alpha*A.depth + beta*B.depth + gamma*C.depth); // 计算当前点深度
 
-            if(d <= zbuffer(px, py)) continue; // 如果比现有更深，则不画，注意z越小、depth越小、越在后
-            // auto g = static_cast<std::uint8_t>(127.5*((d>1?:d)+1)); // 从[-1, 1]映射到[0, 255]
+            if(d <= zbuffer(px, py)) // 如果比现有更深，则不画，注意z越小、depth越小、越在后
+            {
+                continue; 
+            }
+// auto g = static_cast<std::uint8_t>(127.5*((d>1?:d)+1)); // 从[-1, 1]映射到[0, 255]
             zbuffer(px, py) = d;
             
             // 填充正经buffer
@@ -174,12 +164,55 @@ Rasterization::renderTriangle_noJudge(const Pixel& A, const Pixel& B, const Pixe
 }
 
 void
-Rasterization::cheese()
+Rasterization::zbuffer2tga(void)
+{
+    // 刚开始想多了，觉得要遍历一遍zbuffer，或者在渲染时就挑出来，但是由于三角形特质，直接用minmax来接MVP算完的点云即可
+    /*
+        ~~以下是之前基于错误理解实现的，已经不再需要，但是有一点学习意义。~~
+        并非错误，这不还要用回来
+
+        获取z坐标的最大值与最小值，界定near与far，辅助进行透视
+        这个写法是C++20风味的，简洁优美，但得加配置文件让vscode支持cpp20语法
+        &vec4::z是投影参数，让编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
+        返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出
+    */
+
+    auto [zfar, znear] = std::ranges::minmax_element(v_copy, {}, &vec4_zf::z);
+
+    // zfar-znear : 0 - 255
+    float k = 255.f/(znear->z-zfar->z), b = 255.f*zfar->z/(zfar->z-znear->z);
+
+    // 这也是c++23特性，debian12用不了……
+    // for (auto [idx, z] = std::views::enumerate(zbuffer.depth))
+    // 下面这种写法共享的idx会在并行时造成索引错乱
+    // for (auto iter = zbuffer.depth.begin(); iter != zbuffer.depth.end(); ++iter)
+
+    #pragma omp parallel for 
+    for (size_t i = 0; i < zbuffer.depth.size(); i ++)
+    {
+        auto d = zbuffer.depth[i];
+        if (d == std::numeric_limits<float>::lowest()) continue;
+        depthbuffer->set(i, {static_cast<uint8_t>(k*d+b)});
+    }
+}
+
+void
+Rasterization::cheese(void)
 {
     if (showAxis) renderAxis();
     buffer.write_tga_file("framebuffer.tga");
 
-    if (showZbuffer) exit(EXIT_FAILURE);    // TODO: zbuffer2tga
+    if (showZbuffer)
+    {
+        assert(depthbuffer != nullptr && "zbufferTGA invalid");
+        assert(depthbuffer-> width() == zbuffer.width && 
+               depthbuffer->height() == zbuffer.height && 
+               "zbufferTGA not fit zbuffer in memory!");
+        zbuffer2tga();
+        depthbuffer->write_tga_file("zbuffer.tga");
+    }
+
+    std::cout << "绘制完毕" << std::endl;
 }
 
 void 
@@ -190,9 +223,10 @@ Rasterization::setAxis(bool axis)
 }
 
 void 
-Rasterization::setShowZb(bool showzb)
+Rasterization::setShowZb(bool showzb, TGAImage* _depthbuffer)
 {
     this->showZbuffer = showzb;
+    this->depthbuffer = _depthbuffer;
     return;
 }
 

@@ -43,12 +43,13 @@ public:
     void cheese();  // 最终的转出句柄
 
     void setAxis(bool axis);
-    void setShowZb(bool showzb);
+    void setShowZb(bool showzb, TGAImage* _depthbuffer);
     
     Rasterization(TGAImage& _buffer, const std::vector<vec4>& v);
 
 private:
     TGAImage& buffer;
+    TGAImage* depthbuffer;  // 可视化的zbuffer
     ZBuffer zbuffer; // zbuffer只要能够体现出相对深度，double精度过剩
     mat4 modelMat, viewMat, projMat, viewPortMat;
 
