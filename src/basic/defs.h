@@ -19,22 +19,21 @@ TGAColor getRandomColor(void) // 获取随机颜色
             255};
 }
 
-struct Pixel    // 这里原来是叫Point，但有vec3后，就得更具体，这里就是屏幕上一个像素对应的数据结构
+struct Vertex    // 屏幕顶点信息，只有几何，颜色交给shader获取
 {
     int x;
     int y;
-    float depth;
-    TGAColor color;
+    float depth;    
 
-    // 构造函数
-    Pixel(int _x, int _y, double _depth = 0, TGAColor _c = white)
-        : x(_x), y(_y), depth(_depth), color(_c) {}
-    Pixel(vec4 screenPoint, TGAColor _c)
-        : color(_c) {   
-                this->x = static_cast<int>(std::lround(screenPoint.x)), 
-                this->y = static_cast<int>(std::lround(screenPoint.y)), 
-                this->depth = screenPoint.z;
-                }
+    Vertex() = default;
+    Vertex(int _x, int _y, float _depth = 0.f) : x(_x), y(_y), depth(_depth) { }
+    /*
+        如果使用std::round(xxx)，其会返回double，在这里转int还是调入函数默认转换都有额外开销
+        使用lround命令，其返回long，能省去这一步，尽管在linux下long是64位，但开销也比float小
+    */
+    Vertex(vec4 v): x(static_cast<int>(std::lround(v.x))), y(static_cast<int>(std::lround(std::lround(v.y)))), depth(static_cast<float>(v.z)) { }
+    Vertex(vec4_zf v): x(static_cast<int>(std::lround(v.x))), y(static_cast<int>(std::lround(std::lround(v.y)))), depth(v.z) { }
+
 };
 
 struct face_obj // 组成一个面的三个点索引

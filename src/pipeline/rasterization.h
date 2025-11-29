@@ -9,6 +9,7 @@
 #include "../basic/tgaimage.h"
 #include "../basic/homocoor.h"
 #include "vertex.h"
+#include "fragment.h"
 
 #include <iostream>
 
@@ -39,7 +40,7 @@ struct ZBuffer
 class Rasterization 
 {
 public:
-    void renderOBJ(Model& model, Camera& camera);
+    void renderOBJ(Model& model, Camera& camera, Shader& shader);
     void cheese();  // 最终的转出句柄
 
     void setAxis(bool axis);
@@ -60,16 +61,16 @@ private:
     bool showAxis;
     bool showZbuffer;
 
-    std::pair<std::pair<int, int>, std::pair<int, int>> getBbox(const Pixel& a, const Pixel& b, const Pixel& c); // Pixel封装，获取三角形包围框
-    void renderTriangle(const Pixel& a, const Pixel& b, const Pixel& c);
-    void renderTriangle_noJudge(const Pixel& a, const Pixel& b, const Pixel& c);
+    std::pair<std::pair<int, int>, std::pair<int, int>> getBbox(const std::array<Vertex, 3>& screen); // 获取三角形包围框
+    void renderTriangle(const std::array<Vertex, 3>& screen, Shader& shader);
+    void renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shader& shader);
     void zbuffer2tga();
-    void renderAxis();
+    void renderAxis(Shader& shader);
 };
 
 // 计算三像素围成的有向面积
 inline
-float computeArea(const Pixel& a, const Pixel& b, const Pixel& c)
+float computeArea(const std::array<Vertex, 3>& screen)
 {
     /*
         三角形共面任意一点都可以用三角形的重心坐标来表示，并且任意一值小于0就能判定这一点位于三角形外
@@ -81,5 +82,7 @@ float computeArea(const Pixel& a, const Pixel& b, const Pixel& c)
         所以用二维向量叉积u✖v就可以求出三角形的有向面积，其等价于二维标量(u_x*v_y - u_y*v_x)，
         其中，u=ab=(bx-ax, by-ay), v=ac=(cx-ax, cy-ay)。
     */
-    return (a.x*(b.y-c.y) + b.x*(c.y-a.y) + c.x*(a.y-b.y)) / 2.0f; 
+    return (screen[0].x*(screen[1].y-screen[2].y) + 
+            screen[1].x*(screen[2].y-screen[0].y) + 
+            screen[2].x*(screen[0].y-screen[1].y)) / 2.0f; 
 }

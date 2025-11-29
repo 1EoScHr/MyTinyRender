@@ -93,3 +93,24 @@ void drawOBJ_navie(std::string path, TGAImage& buffer, TGAImage& zbuffer, Rotate
     std::cout << "绘制完毕" << std::endl;
 }
 */
+
+/*
+struct Pixel    // 只有几何信息，颜色交给shader获取
+{
+    // 这里原来是叫Point，但有vec3后，就得更具体，这里就是屏幕上一个像素对应的数据结构
+    int x;
+    int y;
+    float depth;
+    TGAColor color;
+
+    // 构造函数
+    Pixel(int _x, int _y, double _depth = 0, TGAColor _c = white)
+        : x(_x), y(_y), depth(_depth), color(_c) {}
+    Pixel(vec4 screenPoint, TGAColor _c)
+        : color(_c) {   
+                this->x = static_cast<int>(std::lround(screenPoint.x)), 
+                this->y = static_cast<int>(std::lround(screenPoint.y)), 
+                this->depth = screenPoint.z;
+                }
+};
+*/

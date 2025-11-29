@@ -17,13 +17,15 @@ Rasterization::Rasterization(TGAImage& _buffer, const std::vector<vec4>& v)
 }
 
 void 
-Rasterization::renderOBJ(Model& model, Camera& camera)
+Rasterization::renderOBJ(Model& model, Camera& camera, Shader& shader)
 {
+    /* 一条渲染管线开始 */
+
     std::cout << "绘制中" << std::endl;
 
     // 获取模型的点、面信息，顶点由于要被变换，为满足其不可变，直接使用其副本
-    // v实际上是vertexCopy
-    const auto& f = model.getFace();
+    // v实际上是vertexCopy，已经作为副本存入
+    const auto& f = model.getFace();    // 面信息获取
 
     // 模型变换 Model
     modelMat = model.getModelMat();
@@ -48,35 +50,28 @@ Rasterization::renderOBJ(Model& model, Camera& camera)
     assert(v_copy.size() == v_raw.size() && "vertex's raw and copy not same size");
     for (size_t i = 0; i < v_copy.size(); i ++)
     {
-        v_copy[i] = MVPV * v_raw[i];
+        // 在这里实现了深度的精度下降，由double变为float，减小开销
+        v_copy[i] = MVPV * v_raw[i];    // 流水线自动处理vertex
         uintize(v_copy[i]);
     }
 
     for (auto& iter : f)
-    {
-        auto p1 = v_copy[iter.v1], p2 = v_copy[iter.v2], p3 = v_copy[iter.v3];
-       
-        /*
-            //auto p1x = std::round((p1.x+1)*w); 
-            round命令返回double(float)，不管是在这里转int还是调入函数默认转换都有额外开销
-            使用lround命令，其返回long，能省去这一步，尽管在linux下long是64位，但开销也比float小
-        */
-        renderTriangle( {static_cast<int>(std::lround(p1.x)), static_cast<int>(std::lround(p1.y)), p1.z, getRandomColor()},
-                        {static_cast<int>(std::lround(p2.x)), static_cast<int>(std::lround(p2.y)), p2.z, getRandomColor()},
-                        {static_cast<int>(std::lround(p3.x)), static_cast<int>(std::lround(p3.y)), p3.z, getRandomColor()});
+    {        
+        auto screen = shader.getTriVertex(v_copy, iter);
+        renderTriangle(screen, shader);
     }
 }
 
-// 计算重心坐标，在原图与zbuffer上绘制三角形
+// 计算重心坐标，绘制三角形
 void 
-Rasterization::renderTriangle(const Pixel& A, const Pixel& B, const Pixel& C)
+Rasterization::renderTriangle(const std::array<Vertex, 3>& screen, Shader& shader)
 {
     // 首先通过bbox判断是否在屏幕内，不在屏幕直接跳过
-    auto [lb, rt] = getBbox(A, B, C);
+    auto [lb, rt] = getBbox(screen);
     if (lb.first > rt.first || lb.second > rt.second) return;
 
     // 然后利用有向面积背面剔除器，一种优化，原理见历史commit的drawjusttriangle中的注释
-    float s_ABC = computeArea(A, B, C);
+    float s_ABC = computeArea(screen);
     if (std::signbit(s_ABC)) return;
     
     #pragma omp parallel for    // 让编译器把其后的for循环并行化，在多核CPU上让不同线程分工执行循环迭代
@@ -85,47 +80,50 @@ Rasterization::renderTriangle(const Pixel& A, const Pixel& B, const Pixel& C)
         for(auto py = lb.second; py <= rt.second; py ++)
         {    
             // 计算重心坐标，用float足够
-            float s_PBC = computeArea(Pixel{px,py}, B, C);
-            float s_PCA = computeArea(Pixel{px,py}, C, A);
-            float s_PAB = computeArea(Pixel{px,py}, A, B);
+            float s_PBC = computeArea({Vertex{px,py}, screen[1], screen[2]});
+            float s_PCA = computeArea({Vertex{px,py}, screen[2], screen[0]});
+            float s_PAB = computeArea({Vertex{px,py}, screen[0], screen[1]});
 
-            float alpha = s_PBC / s_ABC;
-            float beta  = s_PCA / s_ABC;
-            float gamma = s_PAB / s_ABC;
+            vec3_f abg = {s_PBC / s_ABC, s_PCA / s_ABC, s_PAB / s_ABC};
 
             // 判断是否在三角形内，根据重心坐标符号位来判断
             //if(std::signbit(alpha) == std::signbit(beta) && std::signbit(beta) == std::signbit(gamma))
-            if(std::signbit(alpha) || std::signbit(beta) || std::signbit(gamma))
+            if(std::signbit(abg.alpha) || std::signbit(abg.beta) || std::signbit(abg.gamma))
                 continue;
 
             // z-buffer更新
-            float d = (alpha*A.depth + beta*B.depth + gamma*C.depth); // 计算当前点深度
+            float d = (abg.alpha*screen[0].depth + 
+                        abg.beta*screen[1].depth + 
+                       abg.gamma*screen[2].depth); // 计算当前点深度
 
-            if(d <= zbuffer(px, py)) // 如果比现有更深，则不画，注意z越小、depth越小、越在后
+            if(d <= zbuffer(px, py)) // 深度测试：如果比现有更深，则不画，注意z越小、depth越小、越在后
             {
                 continue; 
             }
-// auto g = static_cast<std::uint8_t>(127.5*((d>1?:d)+1)); // 从[-1, 1]映射到[0, 255]
+
+            // 调用shader获取是否丢弃、颜色
+            auto [discard, color] = shader.fragment(abg);
+
+            if (discard)    // 用于一些高级纹理，哪怕通过了所有测试，也会放弃
+            {
+                continue;
+            }
+
+            // buffer填充
             zbuffer(px, py) = d;
-            
-            // 填充正经buffer
-            buffer.set(px, py, 
-               {static_cast<std::uint8_t>(alpha*A.color[0]+beta*B.color[0]+gamma*C.color[0]),
-                static_cast<std::uint8_t>(alpha*A.color[1]+beta*B.color[1]+gamma*C.color[1]),    
-                static_cast<std::uint8_t>(alpha*A.color[2]+beta*B.color[2]+gamma*C.color[2]),
-                static_cast<std::uint8_t>(alpha*A.color[3]+beta*B.color[3]+gamma*C.color[3])});
+            buffer.set(px, py, color);
         }
     }
 }
 
 // 计算重心坐标，在原图与zbuffer上绘制三角形
 void 
-Rasterization::renderTriangle_noJudge(const Pixel& A, const Pixel& B, const Pixel& C)
+Rasterization::renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shader& shader)
 {
-    auto [lb, rt] = getBbox(A, B, C);
+    auto [lb, rt] = getBbox(screen);
     if (lb.first > rt.first || lb.second > rt.second) return;
 
-    float s_ABC = computeArea(A, B, C);
+    float s_ABC = computeArea(screen);
     
     // 让编译器把紧跟其后的 for 循环并行化，在多核 CPU 上让不同线程分工执行循环迭代
     #pragma omp parallel for
@@ -134,31 +132,38 @@ Rasterization::renderTriangle_noJudge(const Pixel& A, const Pixel& B, const Pixe
         for(auto py = lb.second; py < rt.second; py ++)
         {
             // 计算重心坐标
-            float s_PBC = computeArea(Pixel{px,py}, B, C);
-            float s_PCA = computeArea(Pixel{px,py}, C, A);
-            float s_PAB = computeArea(Pixel{px,py}, A, B);
+            float s_PBC = computeArea({Vertex{px,py}, screen[1], screen[2]});
+            float s_PCA = computeArea({Vertex{px,py}, screen[2], screen[0]});
+            float s_PAB = computeArea({Vertex{px,py}, screen[0], screen[1]});
 
-            float alpha = s_PBC / s_ABC;
-            float beta  = s_PCA / s_ABC;
-            float gamma = s_PAB / s_ABC;
+            vec3_f abg = {s_PBC / s_ABC, s_PCA / s_ABC, s_PAB / s_ABC};
 
-            // 判断是否在三角形内，根据符号位来判断
+            // 判断是否在三角形内，根据重心坐标符号位来判断
             //if(std::signbit(alpha) == std::signbit(beta) && std::signbit(beta) == std::signbit(gamma))
-            if(std::signbit(alpha) || std::signbit(beta) || std::signbit(gamma))
+            if(std::signbit(abg.alpha) || std::signbit(abg.beta) || std::signbit(abg.gamma))
                 continue;
 
             // z-buffer更新
-            float d = alpha*A.depth + beta*B.depth + gamma*C.depth; // 计算当前点深度
-            if(d <= zbuffer(px, py)) continue; // 如果比现有更深，则不画，注意z越小、depth越小、越在后
-            //auto g = static_cast<std::uint8_t>(127.5*(d+1)); // 从[-1, 1]映射到[0, 255]
+            float d = (abg.alpha*screen[0].depth + 
+                        abg.beta*screen[1].depth + 
+                       abg.gamma*screen[2].depth); // 计算当前点深度
+
+            if(d <= zbuffer(px, py)) // 深度测试：如果比现有更深，则不画，注意z越小、depth越小、越在后
+            {
+                continue; 
+            }
+
+            // 调用shader获取是否丢弃、颜色
+            auto [discard, color] = shader.fragment(abg);
+
+            if (discard)    // 用于一些高级纹理，哪怕通过了所有测试，也会放弃
+            {
+                continue;
+            }
+
+            // buffer填充
             zbuffer(px, py) = d;
-            
-            // 填充正经buffer
-            buffer.set(px, py, 
-               {static_cast<std::uint8_t>(alpha*A.color[0]+beta*B.color[0]+gamma*C.color[0]),
-                static_cast<std::uint8_t>(alpha*A.color[1]+beta*B.color[1]+gamma*C.color[1]),    
-                static_cast<std::uint8_t>(alpha*A.color[2]+beta*B.color[2]+gamma*C.color[2]),
-                static_cast<std::uint8_t>(alpha*A.color[3]+beta*B.color[3]+gamma*C.color[3])});
+            buffer.set(px, py, color);
         }
     }
 }
@@ -199,7 +204,12 @@ Rasterization::zbuffer2tga(void)
 void
 Rasterization::cheese(void)
 {
-    if (showAxis) renderAxis();
+    if (showAxis) 
+    {
+        RandomShader AxisShader;
+        renderAxis(AxisShader);
+    }
+    
     buffer.write_tga_file("framebuffer.tga");
 
     if (showZbuffer)
@@ -231,7 +241,7 @@ Rasterization::setShowZb(bool showzb, TGAImage* _depthbuffer)
 }
 
 void
-Rasterization::renderAxis()
+Rasterization::renderAxis(Shader& shader)
 {
     // 利用三角形绘制坐标轴，在最后进行
     std::array<vec4, 6> origin; // 原点族，分别在x轴、y轴、z轴
@@ -255,18 +265,15 @@ Rasterization::renderAxis()
     }
     for (size_t i = 0; i < end.size(); i ++)
     {
-        renderTriangle_noJudge( 
-                {origin[0], getRandomColor()}, 
-                {origin[1], getRandomColor()}, 
-                {end[i], getRandomColor()});
-        renderTriangle_noJudge( 
-                {origin[2], getRandomColor()}, 
-                {origin[3], getRandomColor()}, 
-                {end[i], getRandomColor()});
-        renderTriangle_noJudge(
-                {origin[4], getRandomColor()}, 
-                {origin[5], getRandomColor()}, 
-                {end[i], getRandomColor()});
+        renderTriangle_noJudge({{
+            origin[0], origin[1], end[i]
+        }}, shader);
+        renderTriangle_noJudge({{
+            origin[2], origin[3], end[i]
+        }}, shader);
+        renderTriangle_noJudge({{
+            origin[4], origin[5], end[i]
+        }}, shader);
     }
 }
 
@@ -287,11 +294,11 @@ Rasterization::getViewPortMat()
 
 // 获取三角形的包围盒，Pixel封装版本，使用结构化绑定比较高效
 std::pair<std::pair<int, int>, std::pair<int, int>>
-Rasterization::getBbox(const Pixel& A, const Pixel& B, const Pixel& C) // 获得BoundingBox
+Rasterization::getBbox(const std::array<Vertex, 3>& screen) // 获得BoundingBox
 {
     // left back和right top
-    auto [l, r] = std::minmax({A.x, B.x, C.x});
-    auto [b, t] = std::minmax({A.y, B.y, C.y});
+    auto [l, r] = std::minmax({screen[0].x, screen[1].x, screen[2].x});
+    auto [b, t] = std::minmax({screen[0].y, screen[1].y, screen[2].y});
     
     // 加一个限制，防止bbox越界，进行裁剪
     return std::make_pair(std::make_pair(std::max(l, 0), std::max(b, 0)),

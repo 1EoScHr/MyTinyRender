@@ -3,6 +3,7 @@
 #include "basic/defs.h"
 #include "basic/tgaimage.h"
 #include "pipeline/vertex.h"
+#include "pipeline/fragment.h"
 #include "pipeline/rasterization.h"
 
     //                                   //
@@ -27,6 +28,7 @@ int main(int argc, char** argv) {
 // init：管线初始化
     Model model(path1);
     Camera camera(width/height);
+    RandomShader shader;
     Rasterization raster(framebuffer, model.getVertex());
 
 // setting：管线配置
@@ -34,13 +36,13 @@ int main(int argc, char** argv) {
     // model.setPos({0, 0, -1, 0});
 
     // camera.addShift({0, 0, 3, 0});
-    // camera.setPos({0, 0, 1, 0});
+    // camera.setPos({0, 0, 1, 1});
 
     raster.setShowZb(true, &zbuffer);
     // raster.setAxis(true);
 
 // running：管线运行
-    raster.renderOBJ(model, camera);
+    raster.renderOBJ(model, camera, shader);
     raster.cheese();    // 茄子！
 
     return 0;

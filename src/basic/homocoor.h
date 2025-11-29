@@ -165,6 +165,14 @@ struct vec4_zf
     vec4_zf(const mat<4, 1>& ma);
 };
 
+// 重心坐标，float够用
+struct vec3_f
+{
+    float alpha;
+    float beta;
+    float gamma;
+};
+
 // 以下是照猫画虎，实现一个简陋的矩阵
 
 // m*n矩阵模板

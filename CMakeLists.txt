@@ -28,6 +28,7 @@ set(SOURCES
     
     src/pipeline/rasterization.cpp
     src/pipeline/vertex.cpp
+    src/pipeline/fragment.cpp
     
     src/tools/objreader.cpp
 )
