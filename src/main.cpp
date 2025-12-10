@@ -2,8 +2,9 @@
 
 #include "basic/defs.h"
 #include "basic/tgaimage.h"
-#include "pipeline/vertex.h"
-#include "pipeline/fragment.h"
+#include "pipeline/camera.h"
+#include "pipeline/model.h"
+#include "pipeline/shader.h"
 #include "pipeline/rasterization.h"
 
     //                                   //
@@ -26,13 +27,13 @@ int main(int argc, char** argv) {
     std::string path3 = "../resource/obj/bunny/bunny.obj";
 
 // init：管线初始化
-    Model model(path1);
+    Model model(path2);
     Camera camera(width/height);
-    RandomShader shader;
-    Rasterization raster(framebuffer, model.getVertex());
+    RandomShader shader(model, camera);
+    Rasterization raster(framebuffer);
 
 // setting：管线配置
-    model.setRotate(M_PI, 1);
+    model.setRotate(M_PI/2, 1);
     // model.setPos({0, 0, -1, 0});
 
     // camera.addShift({0, 0, 3, 0});

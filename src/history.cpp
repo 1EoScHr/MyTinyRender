@@ -114,3 +114,37 @@ struct Pixel    // 只有几何信息，颜色交给shader获取
                 }
 };
 */
+
+/*
+    // 下面这是cpp23引入的新特性，用zip结构化绑定，同步访问；但是现在用的debian12，没升级，用不了www
+    for (auto& [iter, rawiter] : std::ranges::views::zip(v_copy, model.getVertex())) // 再进行投影、视口变换，把东西先映射到[-1,1]^3，再到屏幕区域。
+    {
+        iter = MVPV * rawiter;
+        uintize(iter);
+    }
+
+    // 就用这个简陋手动方法 
+    const auto& v_raw = model.getVertex();
+    assert(v_copy.size() == v_raw.size() && "vertex's raw and copy not same size");
+    for (size_t i = 0; i < v_copy.size(); i ++)
+    {
+        // 在这里实现了深度的精度下降，由double变为float，减小开销
+        v_copy[i] = MVPV * v_raw[i];    // 流水线自动处理vertex
+        uintize(v_copy[i]);
+    }
+*/
+
+/*
+    // 结果还是给pass了
+    // 刚开始想多了，觉得要遍历一遍zbuffer，或者在渲染时就挑出来，但是由于三角形特质，直接用minmax来接MVP算完的点云即可
+
+    ~~以下是之前基于错误理解实现的，已经不再需要，但是有一点学习意义。~~
+    并非错误，这不还要用回来
+
+    获取z坐标的最大值与最小值，界定near与far，辅助进行透视
+    这个写法是C++20风味的，简洁优美，但得加配置文件让vscode支持cpp20语法
+    &vec4::z是投影参数，让编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
+    返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出
+
+    // auto [zfar, znear] = std::ranges::minmax_element(v_copy, {}, &vec4_zf::z);
+*/

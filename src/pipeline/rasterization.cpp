@@ -1,20 +1,19 @@
 #include "../basic/defs.h"
 #include "../basic/homocoor.h"
-#include "vertex.h"
+#include "model.h"
+#include "camera.h"
+#include "shader.h"
 #include "rasterization.h"
 
 #include <math.h>
-#include <limits>
 #include <ranges>
+#include <limits>
 #include <iostream>
 #include <algorithm>
 
-Rasterization::Rasterization(TGAImage& _buffer, const std::vector<vec4>& v)
+Rasterization::Rasterization(TGAImage& _buffer)
     : buffer(_buffer), depthbuffer(nullptr), zbuffer(_buffer.width(), _buffer.height()), 
-      viewPortDirty(true), showAxis(false), showZbuffer(false)
-{
-    v_copy.resize(v.size());   // 让rasterization里面的vertex副本与原值一致
-}
+      viewPortDirty(true), showAxis(false), showZbuffer(false) { }
 
 void 
 Rasterization::renderOBJ(Model& model, Camera& camera, Shader& shader)
@@ -23,43 +22,30 @@ Rasterization::renderOBJ(Model& model, Camera& camera, Shader& shader)
 
     std::cout << "绘制中" << std::endl;
 
-    // 获取模型的点、面信息，顶点由于要被变换，为满足其不可变，直接使用其副本
-    // v实际上是vertexCopy，已经作为副本存入
+    shader.getMVPV(getViewPortMat());   // MVPV矩阵写入vertex shader
+    float zfar, znear;
+    zfar = std::numeric_limits<float>::max();
+    znear= std::numeric_limits<float>::lowest();
+    
     const auto& f = model.getFace();    // 面信息获取
+    for (auto& iter : f)    // 遍历模型所有面
+    {   
+        // 使用vertex shader依次处理顶点，可以加特殊需求
+        Vertex v1 = shader.vertex(iter, 0);
+        Vertex v2 = shader.vertex(iter, 1);
+        Vertex v3 = shader.vertex(iter, 2);
 
-    // 模型变换 Model
-    modelMat = model.getModelMat();
-    // 视图变换 view/Camera
-    viewMat = camera.getViewMat();
-    // 投影变换 Projection
-    projMat = camera.getProjMat();
-    // 视口变换 Viewport
-    viewPortMat = getViewPortMat();
+        // 为zbuffer2tga准备数据
+        auto [zzfar, zznear] = std::minmax({v1.depth, v2.depth, v3.depth});
+        znear= znear>zznear? znear:zznear;
+        zfar = zfar <zzfar ? zfar :zzfar;
 
-    mat4 MVPV = viewPortMat * projMat * viewMat * modelMat;
-    /*
-        // 下面这是cpp23引入的新特性，用zip结构化绑定，同步访问；但是现在用的debian12，没升级，用不了www
-        for (auto& [iter, rawiter] : std::ranges::views::zip(v_copy, model.getVertex())) // 再进行投影、视口变换，把东西先映射到[-1,1]^3，再到屏幕区域。
-        {
-            iter = MVPV * rawiter;
-            uintize(iter);
-        }
-    */
-    // 就用这个简陋手动方法 
-    const auto& v_raw = model.getVertex();
-    assert(v_copy.size() == v_raw.size() && "vertex's raw and copy not same size");
-    for (size_t i = 0; i < v_copy.size(); i ++)
-    {
-        // 在这里实现了深度的精度下降，由double变为float，减小开销
-        v_copy[i] = MVPV * v_raw[i];    // 流水线自动处理vertex
-        uintize(v_copy[i]);
+        // fragment shader在渲染三角形内
+        renderTriangle({v1, v2, v3}, shader);
     }
 
-    for (auto& iter : f)
-    {        
-        auto screen = shader.getTriVertex(v_copy, iter);
-        renderTriangle(screen, shader);
-    }
+    zbuffer2tga(znear, zfar);
+    renderAxis(shader);
 }
 
 // 计算重心坐标，绘制三角形
@@ -169,23 +155,17 @@ Rasterization::renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shade
 }
 
 void
-Rasterization::zbuffer2tga(void)
+Rasterization::zbuffer2tga(float znear, float zfar)
 {
-    // 刚开始想多了，觉得要遍历一遍zbuffer，或者在渲染时就挑出来，但是由于三角形特质，直接用minmax来接MVP算完的点云即可
-    /*
-        ~~以下是之前基于错误理解实现的，已经不再需要，但是有一点学习意义。~~
-        并非错误，这不还要用回来
+    if (showZbuffer == 0) return;
 
-        获取z坐标的最大值与最小值，界定near与far，辅助进行透视
-        这个写法是C++20风味的，简洁优美，但得加配置文件让vscode支持cpp20语法
-        &vec4::z是投影参数，让编译器不直接比较结构体，而是统一比较投影，是匿名函数[](const &point_obj p){return p.z}的等价简写
-        返回值是最小值与最大值的point_obj迭代器，可以当指针，->来引出
-    */
-
-    auto [zfar, znear] = std::ranges::minmax_element(v_copy, {}, &vec4_zf::z);
+    assert(depthbuffer != nullptr && "zbufferTGA invalid");
+    assert(depthbuffer-> width() == zbuffer.width && 
+           depthbuffer->height() == zbuffer.height && 
+           "zbufferTGA not fit zbuffer in memory!");
 
     // zfar-znear : 0 - 255
-    float k = 255.f/(znear->z-zfar->z), b = 255.f*zfar->z/(zfar->z-znear->z);
+    float k = 255.f/(znear-zfar), b = 255.f*zfar/(zfar-znear);
 
     // 这也是c++23特性，debian12用不了……
     // for (auto [idx, z] = std::views::enumerate(zbuffer.depth))
@@ -203,25 +183,9 @@ Rasterization::zbuffer2tga(void)
 
 void
 Rasterization::cheese(void)
-{
-    if (showAxis) 
-    {
-        RandomShader AxisShader;
-        renderAxis(AxisShader);
-    }
-    
+{    
     buffer.write_tga_file("framebuffer.tga");
-
-    if (showZbuffer)
-    {
-        assert(depthbuffer != nullptr && "zbufferTGA invalid");
-        assert(depthbuffer-> width() == zbuffer.width && 
-               depthbuffer->height() == zbuffer.height && 
-               "zbufferTGA not fit zbuffer in memory!");
-        zbuffer2tga();
-        depthbuffer->write_tga_file("zbuffer.tga");
-    }
-
+    if(showZbuffer) depthbuffer->write_tga_file("zbuffer.tga");
     std::cout << "绘制完毕" << std::endl;
 }
 
@@ -243,6 +207,8 @@ Rasterization::setShowZb(bool showzb, TGAImage* _depthbuffer)
 void
 Rasterization::renderAxis(Shader& shader)
 {
+    if (showAxis == 0) return;
+
     // 利用三角形绘制坐标轴，在最后进行
     std::array<vec4, 6> origin; // 原点族，分别在x轴、y轴、z轴
     origin[0] = {-0.05, 0, 0, 1}, origin[1] = {0.05, 0, 0, 1}, 

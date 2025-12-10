@@ -19,7 +19,7 @@ TGAColor getRandomColor(void) // 获取随机颜色
             255};
 }
 
-struct Vertex    // 屏幕顶点信息，只有几何，颜色交给shader获取
+struct Vertex    // 屏幕顶点信息，只有几何，颜色交给fragment shader获取
 {
     int x;
     int y;
@@ -38,5 +38,11 @@ struct Vertex    // 屏幕顶点信息，只有几何，颜色交给shader获取
 
 struct face_obj // 组成一个面的三个点索引
 {
-    int v1, v2, v3;
+    int v[3];
+
+    int operator[](int i) const
+    {
+        assert(i>=0 && i<3 && "face_obj's idx not in [0,2]");
+        return v[i];
+    }
 };

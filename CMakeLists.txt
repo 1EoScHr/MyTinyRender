@@ -26,10 +26,11 @@ set(SOURCES
 
     src/basic/tgaimage.cpp 
     
+    src/pipeline/model.cpp
+    src/pipeline/camera.cpp
+    src/pipeline/shader.cpp
     src/pipeline/rasterization.cpp
-    src/pipeline/vertex.cpp
-    src/pipeline/fragment.cpp
-    
+
     src/tools/objreader.cpp
 )
 

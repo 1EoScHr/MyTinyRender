@@ -1,5 +1,5 @@
 #include "../basic/homocoor.h"
-#include "../pipeline/vertex.h"
+#include "../pipeline/model.h"
 
 #include <sstream>
 #include <fstream>
@@ -47,15 +47,15 @@ Model::reader(void)
 
             file >> triv;
             pos = triv.find('/');   // 这里使用find方法，从字符串开头，寻找字符/，返回其第一次出现的索引
-            f.back().v1 = std::stoi(triv.substr(0, pos));
+            f.back().v[0] = std::stoi(triv.substr(0, pos));
 
             file >> triv;
             pos = triv.find('/');
-            f.back().v2 = std::stoi(triv.substr(0, pos));
+            f.back().v[1] = std::stoi(triv.substr(0, pos));
 
             file >> triv;
             pos = triv.find('/');
-            f.back().v3 = std::stoi(triv.substr(0, pos));
+            f.back().v[2] = std::stoi(triv.substr(0, pos));
         }  
         else
         {

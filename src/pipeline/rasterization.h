@@ -1,6 +1,8 @@
 /*
     rasterization.h
-    除了vertex和fragment处理外的所有步骤，也就是实际上由图形学api与GPU自动完成的部分
+    除了shader中vertex和fragment处理外的所有步骤，也就是实际上由图形学api与GPU自动完成的部分
+
+    实际上负责三角形遍历，获得shader的原始信息，以及重心坐标计算
 */
 
 #pragma once
@@ -8,8 +10,9 @@
 #include "../basic/defs.h"
 #include "../basic/tgaimage.h"
 #include "../basic/homocoor.h"
-#include "vertex.h"
-#include "fragment.h"
+#include "model.h"
+#include "camera.h"
+#include "shader.h"
 
 #include <iostream>
 
@@ -46,15 +49,13 @@ public:
     void setAxis(bool axis);
     void setShowZb(bool showzb, TGAImage* _depthbuffer);
     
-    Rasterization(TGAImage& _buffer, const std::vector<vec4>& v);
+    Rasterization(TGAImage& _buffer);
 
 private:
     TGAImage& buffer;
     TGAImage* depthbuffer;  // 可视化的zbuffer
     ZBuffer zbuffer; // zbuffer只要能够体现出相对深度，double精度过剩
     mat4 modelMat, viewMat, projMat, viewPortMat;
-
-    std::vector<vec4_zf> v_copy;
     
     bool viewPortDirty;
     mat4 getViewPortMat();
@@ -64,7 +65,7 @@ private:
     std::pair<std::pair<int, int>, std::pair<int, int>> getBbox(const std::array<Vertex, 3>& screen); // 获取三角形包围框
     void renderTriangle(const std::array<Vertex, 3>& screen, Shader& shader);
     void renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shader& shader);
-    void zbuffer2tga();
+    void zbuffer2tga(float znear, float zfar);
     void renderAxis(Shader& shader);
 };
 
