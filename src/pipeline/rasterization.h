@@ -87,3 +87,4 @@ float computeArea(const std::array<Vertex, 3>& screen)
             screen[1].x*(screen[2].y-screen[0].y) + 
             screen[2].x*(screen[0].y-screen[1].y)) / 2.0f; 
 }
+

@@ -165,13 +165,86 @@ struct vec4_zf
     vec4_zf(const mat<4, 1>& ma);
 };
 
-// 重心坐标，float够用
+// 重心坐标，float精度足够
 struct vec3_f
 {
     float alpha;
     float beta;
     float gamma;
 };
+
+struct vec3f
+{
+    float x;
+    float y;
+    float z;
+
+    float& operator[](const int i)       { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }   // 保留[]接口，保持一致性
+    float  operator[](const int i) const { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }
+
+    vec3f& operator+=(const vec3f other)    // 沿袭“利用+=重载”的思路
+    {
+        x += other.x;
+        y += other.y;
+        z += other.z;
+        return *this;
+    }
+    vec3f& operator-=(const vec3f other)
+    {
+        x -= other.x;
+        y -= other.y;
+        z -= other.z;
+        return *this;
+    }
+    vec3f& operator*=(float i)
+    {
+        x *= i;
+        y *= i;
+        z *= i;
+        return *this;
+    }
+
+    vec3f() = default;
+    vec3f(float _x, float _y, float _z) : x(_x), y(_y), z(_z) { }
+    vec3f(vec4_zf v) : x(static_cast<float>(v.x)), y(static_cast<float>(v.y)), z(v.z) { }
+    vec3f(vec4 v) : x(static_cast<float>(v.x)), y(static_cast<float>(v.y)), z(static_cast<float>(v.z)) { }
+};
+
+inline vec3f 
+operator+(vec3f a, const vec3f& b)
+{
+    a += b;
+    return a;
+};
+
+inline vec3f 
+operator-(vec3f a, const vec3f& b)
+{
+    a -= b;
+    return a;
+};
+
+inline vec3f 
+operator*(vec3f a, float n)
+{
+    a *= n;
+    return a;
+};
+
+inline float 
+squareMod(vec3f v)
+{
+    return v.x*v.x + v.y*v.y + v.z*v.z;
+}
+
+// 点乘的重载版，下面还有个函数版，虽然不一定有用……
+// 据称，并不推荐这么重定义，老实用dot吧
+/*
+float operator*(vec3f a, vec3f b)
+{
+    return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+*/
 
 // 以下是照猫画虎，实现一个简陋的矩阵
 
@@ -372,7 +445,7 @@ uintize(vec4_zf& v)    // 齐次坐标规范化
     v.w = 1.0;
 }
 
-// 内联：向量归一化
+// 向量归一化（in-place写法）
 inline void
 normalize(vec<4>& v)
 {
@@ -383,18 +456,59 @@ normalize(vec<4>& v)
     v.z /= mod;
 }
 
-// 内联：四维齐次坐标向量叉乘（实际为三维）
-inline vec4 cross(vec4 v1, vec4 v2)    // 两向量叉乘
+inline void
+normalize(vec3f& v)
+{
+    float mod = 1.f / std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+    v.x *= mod;
+    v.y *= mod;
+    v.z *= mod;
+}
+
+// 四维齐次坐标向量叉乘（实际为三维）
+inline vec4 
+cross(vec4 v1, vec4 v2)    // 两向量叉乘
 {
     /*
         i    j    k
      v1.x v1.y v1.z
      v2.x v2.y v2.z
     */
+    assert(v1.w == 0 && v1.w == 0 && "vec4 cross, but w not 0");
     vec4 ret;
     ret[0] = v1.y*v2.z - v1.z*v2.y;
     ret[1] = v1.z*v2.x - v1.x*v2.z;
-    ret[3] = v1.x*v2.y - v1.y-v2.x;
+    ret[2] = v1.x*v2.y - v1.y*v2.x; // fix bug：属于手误，之前没有发现是因为没有乱动过相机!
+    ret[3] = 0;
+    return ret;
+}
+
+// 三维向量叉乘
+inline vec3f
+cross(vec3f v1, vec3f v2)
+{
+    vec3f ret;
+    ret[0] = v1.y*v2.z - v1.z*v2.y;
+    ret[1] = v1.z*v2.x - v1.x*v2.z;
+    ret[2] = v1.x*v2.y - v1.y*v2.x;
+    return ret;
+}
+
+// 三维向量点乘
+inline float
+dot(vec3f v1, vec3f v2)
+{
+    return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
+}
+
+// 计算半程向量
+inline vec3f
+halfVec(vec3f v1, vec3f v2)
+{
+    vec3f ret = v1 + v2;
+    float dist = std::sqrt(squareMod(ret));
+    if (dist < 1e-8f) return {0.f, 0.f, 0.f};
+    ret *= 1.f / dist;
     return ret;
 }
 

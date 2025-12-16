@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <fstream>
 #include <vector>
+#include <algorithm>
 
 /*
 下面两个成套的宏是结构体内存对齐控制指令，多用于二进制文件头、网络协议、嵌入式寄存器映射等；
@@ -43,6 +44,28 @@ struct TGAColor {
     std::uint8_t& operator[](const int i) { return bgra[i]; } 
     const std::uint8_t& operator[](const int i) const { return bgra[i]; }
 };
+
+inline TGAColor
+operator*(const TGAColor& color, float i)
+{
+    TGAColor ret = color;
+    ret[0] = static_cast<uint8_t>(std::clamp(ret[0]*i, .0f, 255.f));  // c++17引入的clamp，截断
+    ret[1] = static_cast<uint8_t>(std::clamp(ret[1]*i, .0f, 255.f));
+    ret[2] = static_cast<uint8_t>(std::clamp(ret[2]*i, .0f, 255.f));
+    // 透明度暂不考虑
+    return ret;
+};
+
+inline TGAColor
+operator+(const TGAColor& a, const TGAColor& b)
+{
+    TGAColor ret = a;
+    ret[0] = static_cast<uint8_t>(std::clamp(static_cast<int>(a[0])+b[0], 0, 255)); // 不要写成求平均值！能量是绝对的；这里用int是因为没有涉及浮点，更快
+    ret[1] = static_cast<uint8_t>(std::clamp(static_cast<int>(a[1])+b[1], 0, 255));
+    ret[2] = static_cast<uint8_t>(std::clamp(static_cast<int>(a[2])+b[2], 0, 255));
+    // 透明度依旧暂不考虑
+    return ret;
+}
 
 /*
 TGA图片结构体，封装了一整张tga格式图像

@@ -28,7 +28,7 @@ public:
     virtual Vertex   // vertex-shader
     vertex(const face_obj& f, int idx) = 0;
 
-    virtual void getMVPV(const mat4& viewPortMat) = 0;  // 获取MVPV矩阵
+    virtual void getMVPV(const mat4& MV, const mat4& PV) = 0;  // 获取MVPV矩阵 // 更新：在实现光照模型时，需要分开，这样写更泛用
 
     // fragment-shader
     virtual // 这是虚函数
@@ -51,8 +51,7 @@ private:
     const Model& model;
     const Camera& camera;
 
-    mat4 modelMat, viewMat, projMat, viewPortMat;
-    mat4 MVPV;
+    mat4 MVPV;  // modelMat, viewMat, projMat, viewPortMat
 
     std::array<TGAColor, 3> color;
 
@@ -60,7 +59,41 @@ public:
     Vertex vertex(const face_obj& f, int idx) override;
     std::pair<bool, TGAColor> fragment(const vec3_f abg) const override;
     
-    void getMVPV(const mat4& viewPortMat) override;
-    RandomShader() = default;
+    void getMVPV(const mat4& MV, const mat4& PV) override;
     RandomShader(const Model& _model, const Camera& _camera);
+    RandomShader() = default;
+};
+
+// B-P着色模型，最经典，面法向量
+class BPShader : public Shader
+{
+private:
+    const Model& model;
+    const Camera& camera;
+
+    mat4 MV, PV;    // BP光照模型需要分开
+
+    vec3f light;    // 点光源位置
+    TGAColor model_color;   // 模型底色，现在是单色，以后用材质会改这里
+    TGAColor light_color;   // 光照颜色
+    float I;        // 光源光照强度
+    float Ia;       // 环境光照强度
+    float kd, ks, ka;   // 漫反射系数、镜面反射系数、环境光系数
+
+    std::array<vec3f, 3> ver;    // 当前面的三个顶点
+    vec3f normal;   // 当前面的法向量
+    vec3f toWatch;  // 当前面到观察点向量
+    vec3f toLight;  // 当前面到光源方向向量
+    float squareDist;// 距离平方
+
+public:
+    Vertex vertex(const face_obj& f, int idx) override;
+    std::pair<bool, TGAColor> fragment(const vec3_f abg) const override;
+    void getMVPV(const mat4& MV, const mat4& PV) override;
+
+    void setLight(vec4 _light);
+    void setLightColor(TGAColor color);
+
+    BPShader(const Model& _model, const Camera& _camera);
+    BPShader() = default;
 };

@@ -16,6 +16,12 @@ Camera::setPos(vec4 newPos)
     return;
 }
 
+vec4 
+Camera::getCamPos(void) const
+{
+    return e;
+}
+
 void 
 Camera::addShift(vec4 shift)
 {

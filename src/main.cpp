@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
 // output：TGA文件初始化
     constexpr int width  = 800;
     constexpr int height = 800;
-    TGAImage framebuffer(width, height, TGAImage::RGB);
+    TGAImage framebuffer(width, height, TGAImage::RGB, yellow);
     TGAImage zbuffer(width, height, TGAImage::GRAYSCALE); // 才发现这里可以直接用灰度图类型，前面都自作聪明用RGB :(
 
 // input：模型路径初始化
@@ -29,12 +29,13 @@ int main(int argc, char** argv) {
 // init：管线初始化
     Model model(path2);
     Camera camera(width/height);
-    RandomShader shader(model, camera);
+    // RandomShader shader(model, camera);
+    BPShader shader(model, camera);
     Rasterization raster(framebuffer);
 
 // setting：管线配置
     model.setRotate(M_PI/2, 1);
-    // model.setPos({0, 0, -1, 0});
+    // model.setPos({0, 0, -1, 1});
 
     // camera.addShift({0, 0, 3, 0});
     // camera.setPos({0, 0, 1, 1});

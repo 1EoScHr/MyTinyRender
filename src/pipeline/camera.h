@@ -32,6 +32,9 @@ public:
     bool getViewDirty(void) const;
     bool getProjDirty(void) const;
 
+    // 获取相机当前位置
+    vec4 getCamPos(void) const;
+
     // 主功能
     mat4 getViewMat(void) const;
     mat4 getProjMat(void) const;

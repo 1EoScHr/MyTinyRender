@@ -22,7 +22,10 @@ Rasterization::renderOBJ(Model& model, Camera& camera, Shader& shader)
 
     std::cout << "绘制中" << std::endl;
 
-    shader.getMVPV(getViewPortMat());   // MVPV矩阵写入vertex shader
+    mat4 MV = camera.getViewMat() * model.getModelMat();// 模型变换 Model + 视图变换 view/Camera
+    mat4 PV = getViewPortMat() * camera.getProjMat();   // 投影变换 Projection + 视口变换 Viewport
+    shader.getMVPV(MV, PV);
+
     float zfar, znear;
     zfar = std::numeric_limits<float>::max();
     znear= std::numeric_limits<float>::lowest();
