@@ -52,6 +52,8 @@ Camera::setT(vec4 newT)
 void 
 Camera::setNearAndFar(double newNear, double newFar)
 {
+    assert(newFar > 0 && newNear > 0 && "near & far should be postive, i'll trans it, no worry");
+
     this->near = newNear;
     this->far = newFar;
     projDirty = true;
@@ -84,7 +86,7 @@ Camera::setAspect(double newAspect)
 
 Camera::Camera(double _aspect)
     : e({0, 0, 2., 1}), g({0, 0, -1, 0}), t({0, 1, 0, 0}), shift({0, 0, 0, 0}),
-    fov(M_PI / 2.), aspect(_aspect), near(-1), far(-100), perspective(true),
+    fov(M_PI / 2.), aspect(_aspect), near(1.), far(100.), perspective(true),
     viewDirty(true), projDirty(true)
 {
     double hdiv2 = std::abs(near) * std::tan(fov/2);    // 几何关系推导
@@ -100,22 +102,24 @@ Camera::getPersp2OrthoMat(void) const
     if (perspective)
     {
         /*
-            根据相似三角形（cam - near - z）可得到x、y上的映射关系（相机坐标系）：
-            x'(y')= x(y) * n/z
-            但这时z也会变，未知，就要靠“近平面完全不变”与“远平面只有中点z不变”两个来构造、解方程
+            根据相似三角形（cam - near - z）可得到x、y上的映射关系（相机坐标系，认为n、f为正值）：
+            x'= x * n/(-z), y'= y * n/(-z)
+            注：这里课程ppt说的其实是一个全是正的情况，所以实践来才发现有错漏之处，所以修改
+
+            但这时z也会变，未知，就要靠“近平面完全不变”与“远平面只有中点z不变”两个来构造、解方程。
 
             n   0   0   0
             0   n   0   0
-            0   0 n+f -nf
-            0   0   1   0
+            0   0 n+f  nf
+            0   0  -1   0
+        */
 
-            */ 
         mat4 persp2orthoMat;
         persp2orthoMat(0, 0) = near;
         persp2orthoMat(1, 1) = near;
         persp2orthoMat(2, 2) = near + far;
-        persp2orthoMat(2, 3) = -near * far;
-        persp2orthoMat(3, 2) = 1;
+        persp2orthoMat(2, 3) = near * far;
+        persp2orthoMat(3, 2) = -1.;
 
         return persp2orthoMat;
     }
@@ -132,12 +136,12 @@ Camera::getOrthoMat(void) const
     mat4 moveBack = get1Mat();  // 把视长方体中心移动到坐标原点
     moveBack(0, 3) = -0.5 * (left  + right);
     moveBack(1, 3) = -0.5 * (bottom+ top);
-    moveBack(2, 3) = -0.5 * (near  + far);
+    moveBack(2, 3) =  0.5 * (near  + far);  // 更新：near与far现在为绝对值，要加负号转换为原来的坐标，实则负负得正
 
     mat4 transMat;  // 从视长方体转换为[-1, 1]^3正立方体
     transMat(0, 0) = 2 / (right- left);
     transMat(1, 1) = 2 / (top  - bottom);
-    transMat(2, 2) = 2 / (near - far);
+    transMat(2, 2) = 2 / (far  - near);  // 更新：同上，near与far含义变化
     transMat(3, 3) = 1;
 
     mat4 OrthoMat = transMat * moveBack;    // 先平移回原点再变换

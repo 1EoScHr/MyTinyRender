@@ -206,8 +206,8 @@ struct vec3f
 
     vec3f() = default;
     vec3f(float _x, float _y, float _z) : x(_x), y(_y), z(_z) { }
-    vec3f(vec4_zf v) : x(static_cast<float>(v.x)), y(static_cast<float>(v.y)), z(v.z) { }
-    vec3f(vec4 v) : x(static_cast<float>(v.x)), y(static_cast<float>(v.y)), z(static_cast<float>(v.z)) { }
+    vec3f(const vec4_zf& v) : x(static_cast<float>(v.x)), y(static_cast<float>(v.y)), z(v.z) { }
+    vec3f(const vec4& v) : x(static_cast<float>(v.x)), y(static_cast<float>(v.y)), z(static_cast<float>(v.z)) { }
 };
 
 inline vec3f 
@@ -225,11 +225,18 @@ operator-(vec3f a, const vec3f& b)
 };
 
 inline vec3f 
-operator*(vec3f a, float n)
+operator*(vec3f v, float f)
 {
-    a *= n;
-    return a;
+    v *= f;
+    return v;
 };
+
+inline vec3f
+operator*(float f, vec3f v)
+{
+    v *= f;
+    return v;
+}
 
 inline float 
 squareMod(vec3f v)
@@ -411,6 +418,44 @@ struct mat<4, 1>
 
 typedef mat<3, 3> mat3;
 typedef mat<4, 4> mat4;
+
+struct mat3f
+{
+    std::array<float, 9> data = {};
+
+    float& operator()(const int i, const int j)       { assert(i>=0 && i<3 && j>=0 && j<3); return data[i*3+j]; }  // 不要写反成i*m+j了
+    float  operator()(const int i, const int j) const { assert(i>=0 && i<3 && j>=0 && j<3); return data[i*3+j]; }
+
+    mat3f() = default;
+    mat3f(const mat4& m4) 
+    {
+        data[0] = static_cast<float>(m4(0,0));
+        data[1] = static_cast<float>(m4(0,1)); 
+        data[2] = static_cast<float>(m4(0,2)); 
+        data[3] = static_cast<float>(m4(1,0)); 
+        data[4] = static_cast<float>(m4(1,1)); 
+        data[5] = static_cast<float>(m4(1,2)); 
+        data[6] = static_cast<float>(m4(2,0)); 
+        data[7] = static_cast<float>(m4(2,1)); 
+        data[8] = static_cast<float>(m4(2,2)); 
+    }
+};
+
+inline vec3f
+operator*(const mat3f& m, const vec3f& v)
+{
+    vec3f ret;
+    
+    for (int i = 0; i < 3; i ++)
+    {
+        for (int k = 0; k < 3; k ++)
+        {
+            ret[i] += m(i, k) * v[k];
+        }   
+    }
+
+    return ret;
+}
 
 // 内联：获取四维单位矩阵
 inline mat4

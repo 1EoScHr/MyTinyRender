@@ -22,7 +22,7 @@ public:
     void setRotate(double rad, int axis); // 改变某轴上的旋转角度
 
     vec4 getVertex(int idx) const;
-    //std::vector<vec4> getVertexCopy(void);    // 不使用此方法，因为大对象栈上传参要多一次复制开销，直接用auto接const T&就能行
+    vec3f getVertexNormal(int idx) const;
     const std::vector<face_obj>& getFace(void) const;
     bool getModelDirty(void) const;
 
@@ -42,6 +42,7 @@ private:
     vec4 z_axis = {0, 0, 1, 0};
 ////////////////////////////////////////////////3DV小作业*/
 
-    std::vector<vec4> v;        // 顶点坐标信息
+    std::vector<vec4> v;        // 顶点坐标
     std::vector<face_obj> f;    // 面三角索引
+    std::vector<vec3f> vn;      // 顶点向量
 };

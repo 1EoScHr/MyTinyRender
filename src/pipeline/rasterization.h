@@ -12,7 +12,7 @@
 #include "../basic/homocoor.h"
 #include "model.h"
 #include "camera.h"
-#include "shader.h"
+#include "./shader/shader.h"
 
 #include <iostream>
 
@@ -57,6 +57,8 @@ private:
     ZBuffer zbuffer; // zbuffer只要能够体现出相对深度，double精度过剩
     mat4 modelMat, viewMat, projMat, viewPortMat;
     
+    float zfar, znear;
+
     bool viewPortDirty;
     mat4 getViewPortMat();
     bool showAxis;
@@ -67,6 +69,10 @@ private:
     void renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shader& shader);
     void zbuffer2tga(float znear, float zfar);
     void renderAxis(Shader& shader);
+
+    void faceTaskOnGPU(const std::vector<face_obj>& f, Shader& shader);
+    void otherGPUWork(vec4& clip0, vec4& clip1, vec4& clip2, Shader& shader);
+    inline bool in_frustum(const vec4& clip);
 };
 
 // 计算三像素围成的有向面积

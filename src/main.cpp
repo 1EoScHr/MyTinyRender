@@ -4,7 +4,7 @@
 #include "basic/tgaimage.h"
 #include "pipeline/camera.h"
 #include "pipeline/model.h"
-#include "pipeline/shader.h"
+#include "pipeline/shader/shader.h"
 #include "pipeline/rasterization.h"
 
     //                                   //
@@ -30,7 +30,8 @@ int main(int argc, char** argv) {
     Model model(path2);
     Camera camera(width/height);
     // RandomShader shader(model, camera);
-    BPShader shader(model, camera);
+    BPShader_Flat shader(model, camera);
+    // BPShader_Phong shader(model, camera);
     Rasterization raster(framebuffer);
 
 // setting：管线配置

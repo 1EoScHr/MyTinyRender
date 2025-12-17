@@ -28,8 +28,10 @@ set(SOURCES
     
     src/pipeline/model.cpp
     src/pipeline/camera.cpp
-    src/pipeline/shader.cpp
     src/pipeline/rasterization.cpp
+
+    src/pipeline/shader/BlinnPhong.cpp
+    src/pipeline/shader/random.cpp
 
     src/tools/objreader.cpp
 )

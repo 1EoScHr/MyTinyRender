@@ -50,7 +50,7 @@ private:
     // 视锥信息
     double fov;         // Y方向上可视角度，可转换为X上
     double aspect;      // 宽高比，一般要与屏幕相同，否则会变形
-    double near, far;   // 相机最近/最远能看到的距离
+    double near, far;   // 相机最近/最远能看到的距离    // 更新：这里要用正值，以适应标准约定
     double left, right;
     double bottom, top;
     bool perspective;       // 是否进行透视投影

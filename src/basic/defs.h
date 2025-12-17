@@ -38,11 +38,13 @@ struct Vertex    // 屏幕顶点信息，只有几何，颜色交给fragment sha
 
 struct face_obj // 组成一个面的三个点索引
 {
-    int v[3];
+    int v[3];   // vertex索引
+    int vn[3];  // vertex normal索引
 
-    int operator[](int i) const
+    std::pair<int, int>
+    operator[](int i) const
     {
         assert(i>=0 && i<3 && "face_obj's idx not in [0,2]");
-        return v[i];
+        return {v[i], vn[i]};
     }
 };

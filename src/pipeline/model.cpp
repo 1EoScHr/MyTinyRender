@@ -59,6 +59,12 @@ Model::getVertex(int idx) const
     return v[idx];
 }
 
+vec3f
+Model::getVertexNormal(int idx) const
+{
+    return vn[idx];
+}
+
 const std::vector<face_obj>& 
 Model::getFace(void) const
 {
