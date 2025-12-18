@@ -47,7 +47,7 @@ Rasterization::renderTriangle(const std::array<Vertex, 3>& screen, Shader& shade
     float s_ABC = computeArea(screen);
     if (std::signbit(s_ABC)) return;
     
-    #pragma omp parallel for    // 让编译器把其后的for循环并行化，在多核CPU上让不同线程分工执行循环迭代
+    // #pragma omp parallel for    // 让编译器把其后的for循环并行化，在多核CPU上让不同线程分工执行循环迭代
     for(auto px = lb.first; px <= rt.first; px ++)
     {
         for(auto py = lb.second; py <= rt.second; py ++)
@@ -282,7 +282,12 @@ Rasterization::faceTaskOnGPU(const std::vector<face_obj>& f, Shader& shader)
         {
             case 0: continue;  // 整个都不在，直接去下一个面
             case 3: otherGPUWork(clip0, clip1, clip2, shader); break;   // 整个都在，无事发生，继续往下
-            case 1: otherGPUWork(clip0, clip1, clip2, shader); break;   // 卧槽，好复杂，先空下吧
+//                       //
+// //                 // //
+// TODO： 用逐平面裁剪算法 //
+// //                 // //
+//                       //
+            case 1: otherGPUWork(clip0, clip1, clip2, shader); break;   // 卧槽，好复杂，先空下
             case 2: otherGPUWork(clip0, clip1, clip2, shader); break;
         }
     }

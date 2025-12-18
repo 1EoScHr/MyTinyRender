@@ -168,16 +168,16 @@ struct vec4_zf
 // 重心坐标，float精度足够
 struct vec3_f
 {
-    float alpha;
-    float beta;
-    float gamma;
+    float alpha = 0.f;
+    float beta = 0.f;
+    float gamma = 0.f;
 };
 
 struct vec3f
 {
-    float x;
-    float y;
-    float z;
+    float x = 0.f;  // DEBUG:惨痛教训，即使有默认构造，其也不会自动设为0！
+    float y = 0.f;
+    float z = 0.f;
 
     float& operator[](const int i)       { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }   // 保留[]接口，保持一致性
     float  operator[](const int i) const { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }

@@ -114,9 +114,9 @@ private:
     float Ia;       // 环境光照强度
     float kd, ks, ka;   // 漫反射系数、镜面反射系数、环境光系数
 
-    std::array<vec3f, 3> ver;   // 当前面的三个顶点
-    std::array<vec3f, 3> ver_n; // 各顶点的法向量
-
+    std::array<vec3f, 3> ver;   // view space里当前面的三个顶点
+    std::array<vec3f, 3> ver_n; // view space里当前面各顶点的法向量
+    
 public:
     vec4 vertex(const face_obj& f, int idx) override;
     std::pair<bool, TGAColor> fragment(const vec3_f abg) const override;

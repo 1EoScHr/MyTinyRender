@@ -85,9 +85,10 @@ BPShader_Phong::vertex(const face_obj& f, int idx)
 { 
     vec4 v = MV * model.getVertex(f[idx].first); // 从model的v中获取原始vertex，进行MV变换；此时镜头位于原点，并且世界还没有变形
     uintize(v);
+
     vec3f vn = vnMV * model.getVertexNormal(f[idx].second);
     normalize(vn);
-
+    
     ver[idx] = static_cast<vec3f>(v);
     ver_n[idx] = vn;
 
@@ -100,11 +101,20 @@ BPShader_Phong::fragment(const vec3_f abg) const
 {
     /*
         这里插值要注意修正投影空间的畸变
-        因为重心坐标来自投影空间，不能够直接套在相机空间内，见证明。
+        因为重心坐标来自投影空间，不能够直接套在相机空间内
     */
-    vec3f normal = abg.alpha*ver_n[0] + abg.beta*ver_n[1] + abg.gamma*ver_n[2]; 
+
+    // 这里的重心坐标是NDC中的，不等同于view中，不能混用
+    // 根据关系，是与1/-z成线性关系，可以到.md中的“关于NDC/screen空间到view空间重心坐标逆变换”帮助理解
+    // 根据影响力修正完毕后，还要保证重心坐标之和为1，一个线性变换就好。
+    float aa = abg.alpha / ver[0].z;
+    float bb = abg.beta  / ver[1].z;
+    float gg = abg.gamma / ver[2].z;
+    float sum = 1 / (aa + bb + gg);
+
+    vec3f normal = (aa*ver_n[0] + bb*ver_n[1] + gg*ver_n[2]) * sum; 
     normalize(normal);  // 重心坐标插值出fragment的法向量，并重新正则化
-    vec3f toWatch = -abg.alpha*ver[0] - abg.beta*ver[1] - abg.gamma*ver[2]; // 重心坐标插值出fragment的坐标
+    vec3f toWatch = (aa*ver[0] + bb*ver[1] + gg*ver[2]) * -sum; // 重心坐标插值出fragment的反坐标
     vec3f toLight = _light + toWatch;
     float squareDist = squareMod(toLight);
 
