@@ -20,7 +20,7 @@ Rasterization::renderOBJ(Model& model, Camera& camera, Shader& shader)
 {
     /* 一条渲染管线开始 */
 
-    std::cout << "绘制中" << std::endl;
+    std::cout << "绘制...";
 
     modelMat = model.getModelMat();   // 模型变换 Model
     viewMat = camera.getViewMat();   // 视图变换 view/Camera
@@ -47,7 +47,7 @@ Rasterization::renderTriangle(const std::array<Vertex, 3>& screen, Shader& shade
     float s_ABC = computeArea(screen);
     if (std::signbit(s_ABC)) return;
     
-    // #pragma omp parallel for    // 让编译器把其后的for循环并行化，在多核CPU上让不同线程分工执行循环迭代
+    #pragma omp parallel for    // 让编译器把其后的for循环并行化，在多核CPU上让不同线程分工执行循环迭代
     for(auto px = lb.first; px <= rt.first; px ++)
     {
         for(auto py = lb.second; py <= rt.second; py ++)
@@ -173,7 +173,7 @@ Rasterization::cheese(void)
 {    
     buffer.write_tga_file("framebuffer.tga");
     if(showZbuffer) depthbuffer->write_tga_file("zbuffer.tga");
-    std::cout << "绘制完毕" << std::endl;
+    std::cout << "完毕" << std::endl;
 }
 
 void 

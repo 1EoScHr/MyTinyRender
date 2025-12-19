@@ -96,7 +96,7 @@ public:
     BPShader_Flat() = default;
 };
 
-// B-P着色模型，Phong Shading形式，更精细
+// B-P着色模型，Phong Shading形式，实际上是读取vn，更精细
 class BPShader_Phong : public Shader
 {
 private:
@@ -116,7 +116,7 @@ private:
 
     std::array<vec3f, 3> ver;   // view space里当前面的三个顶点
     std::array<vec3f, 3> ver_n; // view space里当前面各顶点的法向量
-    
+
 public:
     vec4 vertex(const face_obj& f, int idx) override;
     std::pair<bool, TGAColor> fragment(const vec3_f abg) const override;
@@ -127,4 +127,43 @@ public:
 
     BPShader_Phong(const Model& _model, const Camera& _camera);
     BPShader_Phong() = default;
+};
+
+// B-P着色模型，全局法线贴图版本
+class BPShader_GlobalNormalMap : public Shader
+{
+private:
+    const Model& model;
+    const Camera& camera;
+
+    mat4 MV, P;    // BP光照模型需要分开
+    mat3f vnMV;
+
+    vec4 light;    // 点光源位置
+    vec3f _light;
+    TGAColor model_color;   // 模型底色，现在是单色，以后用材质会改这里
+    TGAColor light_color;   // 光照颜色
+    float I;        // 光源光照强度
+    float Ia;       // 环境光照强度
+    float kd, ks, ka;   // 漫反射系数、镜面反射系数、环境光系数
+
+    std::array<vec3f, 3> ver;   // view space里当前面的三个顶点
+    // std::array<vec3f, 3> ver_n; // view space里当前面各顶点的法向量 // 全局法向量贴图用不着
+    std::array<vec2_f, 3> ver_t;// view space里当前面各顶点对应的纹理坐标
+    
+public:
+    vec4 vertex(const face_obj& f, int idx) override;
+    std::pair<bool, TGAColor> fragment(const vec3_f abg) const override;
+    void getMVP(const mat4& M, const mat4& V, const mat4& P) override;
+
+    void setLight(vec4 _light);
+    void setLightColor(TGAColor color);
+
+    BPShader_GlobalNormalMap(const Model& _model, const Camera& _camera);
+    BPShader_GlobalNormalMap() = default;
+};
+
+class BPShader_GnmDiffSpec : public BPShader_GlobalNormalMap
+{
+
 };

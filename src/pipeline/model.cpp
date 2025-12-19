@@ -65,6 +65,46 @@ Model::getVertexNormal(int idx) const
     return vn[idx];
 }
 
+vec2_f
+Model::getVertexTexture(int idx) const
+{
+    return vt[idx];
+}
+
+vec3f
+Model::getTexture_nm(vec2_f uv) const
+{
+    // 从贴图的对应uv坐标获取RGB值，并转换为切平面的法向量扰动
+
+    /*
+        //static_cast<int>(std::lround(uv.v * normalMap->height()));
+        这个写法会带来隐形bug，当uv为1时，实际上是height，而实际范围应该是[0,height-1]
+    */
+    int x = std::min(static_cast<int>(std::lround(uv.u * normalMap->width())), normalMap->width() - 1);
+    int y = static_cast<int>(std::lround(uv.v * normalMap->height()));
+
+    vec3f ret(normalMap->get(x, y));
+    
+// 未来可顺手优化成乘法
+    ret.x = (2.f * ret.x - 255.f) / 255.f;
+    ret.y = (2.f * ret.y - 255.f) / 255.f;
+    ret.z = (2.f * ret.z - 255.f) / 255.f;
+
+    return ret;
+}
+
+TGAColor
+Model::getTexture_diff(vec2_f uv) const
+{
+
+}
+
+float
+Model::getTexture_spec(vec2_f uv) const
+{
+
+}
+
 const std::vector<face_obj>& 
 Model::getFace(void) const
 {
@@ -104,12 +144,15 @@ Model::setRotate(double rad, int axis)
     return;
 }
 
-Model::Model(std::string _path) 
-    : path(_path), pos({0., 0., 0., 1.}), shift({0., 0., 0., 0.}), 
-    rotate({0., 0., 0.}), modelDirty(true)
+Model::Model(const std::string& _objFilePath, 
+             const std::string& _nmFilePath,
+             const std::string& _diffFilePath,
+             const std::string& _specFilePath) 
+    : objFilePath(_objFilePath), nmFilePath(_nmFilePath), diffFilePath(_diffFilePath), specFilePath(_specFilePath),
+      pos({0., 0., 0., 1.}), shift({0., 0., 0., 0.}), rotate({0., 0., 0.}), modelDirty(true)  // v、f等没有初始化，会调用默认，也就是创造两个空向量
 {
-    // v和f由于没有初始化，会调用默认，也就是创造两个空向量
-    reader();
+    objReader();
+    textureReader();
 }
 
 mat4

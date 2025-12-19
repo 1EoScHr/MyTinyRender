@@ -33,7 +33,7 @@ set(SOURCES
     src/pipeline/shader/BlinnPhong.cpp
     src/pipeline/shader/random.cpp
 
-    src/tools/objreader.cpp
+    src/tools/filereader.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

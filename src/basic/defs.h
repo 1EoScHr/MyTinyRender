@@ -3,6 +3,8 @@
 #include "homocoor.h"
 #include "tgaimage.h"
 
+#include <tuple>
+
 // TGAColor颜色有关
 constexpr TGAColor white   = {255, 255, 255, 255}; // attention, BGRA order // constexpr：告诉编译器在编译器这个东西就能算出来
 constexpr TGAColor green   = {  0, 255,   0, 255};
@@ -39,12 +41,14 @@ struct Vertex    // 屏幕顶点信息，只有几何，颜色交给fragment sha
 struct face_obj // 组成一个面的三个点索引
 {
     int v[3];   // vertex索引
+    int vt[3];  // 纹理索引
     int vn[3];  // vertex normal索引
 
-    std::pair<int, int>
+    // 返回tuple类型：vertex idx、vt idx、vn idx
+    std::tuple<int, int, int>
     operator[](int i) const
     {
         assert(i>=0 && i<3 && "face_obj's idx not in [0,2]");
-        return {v[i], vn[i]};
+        return {v[i], vt[i], vn[i]};
     }
 };

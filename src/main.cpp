@@ -22,16 +22,19 @@ int main(int argc, char** argv) {
     TGAImage zbuffer(width, height, TGAImage::GRAYSCALE); // 才发现这里可以直接用灰度图类型，前面都自作聪明用RGB :(
 
 // input：模型路径初始化
-    std::string path1 = "../resource/obj/diablo3_pose/diablo3_pose.obj";
-    std::string path2 = "../resource/obj/african_head/african_head.obj";
-    std::string path3 = "../resource/obj/bunny/bunny.obj";
+    std::string obj1 = "../resource/obj/diablo3_pose/diablo3_pose.obj";
+    std::string obj2 = "../resource/obj/african_head/african_head.obj";
+    std::string obj3 = "../resource/obj/bunny/bunny.obj";
+
+    std::string nm2  = "../resource/obj/african_head/african_head_nm.tga";
 
 // init：管线初始化
-    Model model(path2);
+    Model model(obj2, nm2);
     Camera camera(width/height);
     // RandomShader shader(model, camera);
     // BPShader_Flat shader(model, camera);
-    BPShader_Phong shader(model, camera);
+    // BPShader_Phong shader(model, camera);
+    BPShader_GlobalNormalMap shader(model, camera);
     Rasterization raster(framebuffer);
 
 // setting：管线配置

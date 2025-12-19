@@ -18,7 +18,9 @@ RandomShader::getMVP(const mat4& _M, const mat4& _V, const mat4& _P)
 vec4
 RandomShader::vertex(const face_obj& f, int idx)
 {
-    vec4 v = MVP * model.getVertex(f[idx].first);  // 从model的v中获取原始vertex，然后立刻用MVPV变换，得到裁剪空间坐标
+    //                                    |  这里用std::get<>方法来提取tuple，第0项是vertex索引
+    //                                   \|/
+    vec4 v = MVP * model.getVertex(std::get<0>(f[idx]));  // 从model的v中获取原始vertex，然后立刻用MVPV变换，得到裁剪空间坐标
 /*
 目前就只完成了固定的变换，如果有其他想做的可以继续写下去，这就是vertex shader的用法
 */

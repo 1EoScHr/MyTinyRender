@@ -10,6 +10,8 @@
 #include <iostream>
 #include <array>
 
+#include "tgaimage.h"
+
 // 前向声明，在最后的矩阵x向量里，要实现3x1(4x1)矩阵与三维(四维)向量的转化，必须要选一个做前向声明
 template<int m, int n> struct mat;
 template<> struct mat<3, 1>;
@@ -173,6 +175,13 @@ struct vec3_f
     float gamma = 0.f;
 };
 
+// 纹理坐标，float精度足够
+struct vec2_f
+{
+    float u = 0.f;
+    float v = 0.f;
+};
+
 struct vec3f
 {
     float x = 0.f;  // DEBUG:惨痛教训，即使有默认构造，其也不会自动设为0！
@@ -206,6 +215,7 @@ struct vec3f
 
     vec3f() = default;
     vec3f(float _x, float _y, float _z) : x(_x), y(_y), z(_z) { }
+    vec3f(const TGAColor& bgra) : x(static_cast<float>(bgra[2])), y(static_cast<float>(bgra[1])), z(static_cast<float>(bgra[0])) { }
     vec3f(const vec4_zf& v) : x(static_cast<float>(v.x)), y(static_cast<float>(v.y)), z(v.z) { }
     vec3f(const vec4& v) : x(static_cast<float>(v.x)), y(static_cast<float>(v.y)), z(static_cast<float>(v.z)) { }
 };
