@@ -22,22 +22,20 @@ Rasterization::renderOBJ(Model& model, Camera& camera, Shader& shader)
 
     std::cout << "绘制...";
 
-    modelMat = model.getModelMat();   // 模型变换 Model
-    viewMat = camera.getViewMat();   // 视图变换 view/Camera
-    projMat = camera.getProjMat();   // 投影变换 Projection
-    viewPortMat = getViewPortMat();      // 视口变换 Viewport
+    modelMat = model.getModelMat(); // 模型变换 Model
+    viewMat = camera.getViewMat();  // 视图变换 view/Camera
+    projMat = camera.getProjMat();  // 投影变换 Projection
+    viewPortMat = getViewPortMat(); // 视口变换 Viewport
 
     shader.getMVP(modelMat, viewMat, projMat);
 
     const auto& f = model.getFace();    // 面信息获取
-    faceTaskOnGPU(f, shader);
-
-    renderAxis(shader);
+    faceTaskOnGPU(model, f, shader);
 }
 
 // 计算重心坐标，绘制三角形
 void 
-Rasterization::renderTriangle(const std::array<Vertex, 3>& screen, Shader& shader)
+Rasterization::renderTriangle(const std::array<Vertex, 3>& screen, Shader& shader, const Model& model)
 {
     // 首先通过bbox判断是否在屏幕内，不在屏幕直接跳过
     auto [lb, rt] = getBbox(screen);
@@ -75,7 +73,7 @@ Rasterization::renderTriangle(const std::array<Vertex, 3>& screen, Shader& shade
             }
 
             // 调用shader获取是否丢弃、颜色
-            auto [discard, color] = shader.fragment(abg);
+            auto [discard, color] = shader.fragment(model, abg);
 
             if (discard)    // 用于一些高级纹理，哪怕通过了所有测试，也会放弃
             {
@@ -89,9 +87,9 @@ Rasterization::renderTriangle(const std::array<Vertex, 3>& screen, Shader& shade
     }
 }
 
-// 计算重心坐标，在原图与zbuffer上绘制三角形
+// 计算重心坐标，在原图与zbuffer上绘制三角形，不进行背面剔除测试，用于坐标轴、固定信息等
 void 
-Rasterization::renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shader& shader)
+Rasterization::renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shader& shader, const Model& model)
 {
     auto [lb, rt] = getBbox(screen);
     if (lb.first > rt.first || lb.second > rt.second) return;
@@ -127,7 +125,7 @@ Rasterization::renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shade
             }
 
             // 调用shader获取是否丢弃、颜色
-            auto [discard, color] = shader.fragment(abg);
+            auto [discard, color] = shader.fragment(model, abg);
 
             if (discard)    // 用于一些高级纹理，哪怕通过了所有测试，也会放弃
             {
@@ -142,7 +140,7 @@ Rasterization::renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shade
 }
 
 void
-Rasterization::zbuffer2tga(float znear, float zfar)
+Rasterization::zbuffer2tga()
 {
     if (showZbuffer == 0) return;
 
@@ -170,7 +168,9 @@ Rasterization::zbuffer2tga(float znear, float zfar)
 
 void
 Rasterization::cheese(void)
-{    
+{   
+    renderAxis(); 
+    zbuffer2tga();
     buffer.write_tga_file("framebuffer.tga");
     if(showZbuffer) depthbuffer->write_tga_file("zbuffer.tga");
     std::cout << "完毕" << std::endl;
@@ -192,9 +192,12 @@ Rasterization::setShowZb(bool showzb, TGAImage* _depthbuffer)
 }
 
 void
-Rasterization::renderAxis(Shader& shader)
+Rasterization::renderAxis(void)
 {
     if (showAxis == 0) return;
+
+    RandomShader axisShader{};
+    Model emptyModel{};
 
     // 利用三角形绘制坐标轴，在最后进行
     std::array<vec4, 6> origin; // 原点族，分别在x轴、y轴、z轴
@@ -220,13 +223,13 @@ Rasterization::renderAxis(Shader& shader)
     {
         renderTriangle_noJudge({{
             origin[0], origin[1], end[i]
-        }}, shader);
+        }}, axisShader, emptyModel);
         renderTriangle_noJudge({{
             origin[2], origin[3], end[i]
-        }}, shader);
+        }}, axisShader, emptyModel);
         renderTriangle_noJudge({{
             origin[4], origin[5], end[i]
-        }}, shader);
+        }}, axisShader, emptyModel);
     }
 }
 
@@ -259,18 +262,14 @@ Rasterization::getBbox(const std::array<Vertex, 3>& screen) // 获得BoundingBox
 }
 
 void 
-Rasterization::faceTaskOnGPU(const std::vector<face_obj>& f, Shader& shader)
+Rasterization::faceTaskOnGPU(const Model& model, const std::vector<face_obj>& f, Shader& shader)
 {
-    zfar = std::numeric_limits<float>::max();
-    znear= std::numeric_limits<float>::lowest();
-    
-
     for (auto& iter : f)    // 遍历模型所有面
     {   
         // 使用vertex shader获取面的各顶点，但是是裁剪坐标下
-        vec4 clip0 = shader.vertex(iter, 0);
-        vec4 clip1 = shader.vertex(iter, 1);
-        vec4 clip2 = shader.vertex(iter, 2);
+        vec4 clip0 = shader.vertex(model, iter, 0);
+        vec4 clip1 = shader.vertex(model, iter, 1);
+        vec4 clip2 = shader.vertex(model, iter, 2);
 
         // 先判断是否在视锥内，裁剪相关
         bool in0 = in_frustum(clip0);
@@ -281,22 +280,20 @@ Rasterization::faceTaskOnGPU(const std::vector<face_obj>& f, Shader& shader)
         switch (total)
         {
             case 0: continue;  // 整个都不在，直接去下一个面
-            case 3: otherGPUWork(clip0, clip1, clip2, shader); break;   // 整个都在，无事发生，继续往下
+            case 3: otherGPUWork(clip0, clip1, clip2, shader, model); break;   // 整个都在，无事发生，继续往下
 //                       //
 // //                 // //
 // TODO： 用逐平面裁剪算法 //
 // //                 // //
 //                       //
-            case 1: otherGPUWork(clip0, clip1, clip2, shader); break;   // 卧槽，好复杂，先空下
-            case 2: otherGPUWork(clip0, clip1, clip2, shader); break;
+            case 1: otherGPUWork(clip0, clip1, clip2, shader, model); break;   // 卧槽，好复杂，先空下
+            case 2: otherGPUWork(clip0, clip1, clip2, shader, model); break;
         }
     }
-
-    zbuffer2tga(znear, zfar);
 }
 
 void
-Rasterization::otherGPUWork(vec4& clip0, vec4& clip1, vec4& clip2, Shader& shader)
+Rasterization::otherGPUWork(vec4& clip0, vec4& clip1, vec4& clip2, Shader& shader, const Model& model)
 {
     /*
         vertex shader得到裁剪坐标，接下来要通过GPU的另一个模块进行处理
@@ -345,7 +342,7 @@ Rasterization::otherGPUWork(vec4& clip0, vec4& clip1, vec4& clip2, Shader& shade
     zfar = zfar <zzfar ? zfar :zzfar;
 
     // fragment shader在渲染三角形内
-    renderTriangle({v0, v1, v2}, shader);
+    renderTriangle({v0, v1, v2}, shader, model);
 }
 
 // 判断一个裁剪坐标是否在视锥内，属于实际GPU上的固件，所以这里if多没事

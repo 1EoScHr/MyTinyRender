@@ -72,9 +72,9 @@ Model::getVertexTexture(int idx) const
 }
 
 vec3f
-Model::getTexture_nm(vec2_f uv) const
+Model::getTexture_nm(const vec2_f& uv) const
 {
-    // 从贴图的对应uv坐标获取RGB值，并转换为切平面的法向量扰动
+    // 从贴图的对应uv坐标获取RGB值，并转换为法向量
 
     /*
         //static_cast<int>(std::lround(uv.v * normalMap->height()));
@@ -94,15 +94,22 @@ Model::getTexture_nm(vec2_f uv) const
 }
 
 TGAColor
-Model::getTexture_diff(vec2_f uv) const
+Model::getTexture_diff(const vec2_f& uv) const
 {
+    int x = std::min(static_cast<int>(std::lround(uv.u * diffMap->width())), diffMap->width() - 1);
+    int y = static_cast<int>(std::lround(uv.v * diffMap->height()));
 
+    return diffMap->get(x, y);
 }
 
 float
-Model::getTexture_spec(vec2_f uv) const
+Model::getTexture_spec(const vec2_f& uv) const
 {
+    int x = std::min(static_cast<int>(std::lround(uv.u * specMap->width())), specMap->width() - 1);
+    int y = static_cast<int>(std::lround(uv.v * specMap->height()));
 
+// 未来可顺手优化成乘法
+    return specMap->get(x, y).bgra[0] / 255.f;  // spec贴图是一个灰度图，直接除255来映射到[0,1]
 }
 
 const std::vector<face_obj>& 
@@ -160,17 +167,18 @@ Model::getModelMat(void) const
 {
     /*
         获取齐次坐标版模型变换矩阵，包括旋转与平移
-        实际计算时，等效为先平移回原点、再旋转、最后平移到目标处
+        实际计算时，等效为先把模型平移回模型坐标系原点，再把模型空间与世界空间对齐，再旋转，再恢复
     */
     
-    // 先平移回原点/让模型坐标系与世界坐标系重合/站在模型坐标系考虑
+    // 先把模型平移回模型空间原点，再让模型坐标系与世界坐标系重合，两个平移操作可以叠加
+    // 但是由于.obj默认的原点就在世界坐标系原点，所以只需模型平移回模型空间原点就可
     assert(pos.w != 0 && "pos is position, but it's w = 0");
     mat4 moveBack = get1Mat();
-    moveBack(0, 3) = -pos.x;
-    moveBack(1, 3) = -pos.y;
-    moveBack(2, 3) = -pos.z;
+    moveBack(0, 3) = -shift.x;
+    moveBack(1, 3) = -shift.y;
+    moveBack(2, 3) = -shift.z;
 
-    ////////////////////////////////////////////////3DV小作业：绕指定轴旋转
+    ////////////////////////////////////////////////3DV小作业：绕指定轴旋转，已落后版本，重启须评估
 /*
     double angle;
     std::cin >> angle;
@@ -225,7 +233,7 @@ Model::getModelMat(void) const
 */
     ////////////////////////////////////////////////3DV小作业
 
-    // 再旋转
+    // 此时再旋转
     mat4 xrotmat = getRotMat(rotate[0], 0), 
          yrotmat = getRotMat(rotate[1], 1),
          zrotmat = getRotMat(rotate[2], 2);
@@ -248,7 +256,7 @@ Model::getModelMat(void) const
 
     /**/
     
-    // 最后平移到目标
+    // 最后平移回原来的位置，先把坐标系平移到模型坐标系，再坐标系内平移
     assert(shift.w == 0 && "shift is vector, but it's w not 0");   // 向量齐次坐标w为0
     rotmovMat(0, 3) = pos.x + shift.x,
     rotmovMat(1, 3) = pos.y + shift.y,

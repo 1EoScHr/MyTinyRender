@@ -57,7 +57,8 @@ private:
     ZBuffer zbuffer; // zbuffer只要能够体现出相对深度，double精度过剩
     mat4 modelMat, viewMat, projMat, viewPortMat;
     
-    float zfar, znear;
+    float zfar = std::numeric_limits<float>::max();
+    float znear= std::numeric_limits<float>::lowest();
 
     bool viewPortDirty;
     mat4 getViewPortMat();
@@ -65,13 +66,13 @@ private:
     bool showZbuffer;
 
     std::pair<std::pair<int, int>, std::pair<int, int>> getBbox(const std::array<Vertex, 3>& screen); // 获取三角形包围框
-    void renderTriangle(const std::array<Vertex, 3>& screen, Shader& shader);
-    void renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shader& shader);
-    void zbuffer2tga(float znear, float zfar);
-    void renderAxis(Shader& shader);
+    void renderTriangle(const std::array<Vertex, 3>& screen, Shader& shader, const Model& model);
+    void renderTriangle_noJudge(const std::array<Vertex, 3>& screen, Shader& shader, const Model& model);
+    void zbuffer2tga();
+    void renderAxis(void);
 
-    void faceTaskOnGPU(const std::vector<face_obj>& f, Shader& shader);
-    void otherGPUWork(vec4& clip0, vec4& clip1, vec4& clip2, Shader& shader);
+    void faceTaskOnGPU(const Model& model, const std::vector<face_obj>& f, Shader& shader);
+    void otherGPUWork(vec4& clip0, vec4& clip1, vec4& clip2, Shader& shader, const Model& model);
     inline bool in_frustum(const vec4& clip);
 };
 

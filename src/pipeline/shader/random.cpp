@@ -1,8 +1,8 @@
 #include "shader.h"
 #include <cmath>
 
-RandomShader::RandomShader(const Model& _model, const Camera& _camera)
-    : model(_model), camera(_camera) { }
+RandomShader::RandomShader()
+{ }
 
 void
 RandomShader::getMVP(const mat4& _M, const mat4& _V, const mat4& _P)
@@ -16,7 +16,7 @@ RandomShader::getMVP(const mat4& _M, const mat4& _V, const mat4& _P)
 */
 
 vec4
-RandomShader::vertex(const face_obj& f, int idx)
+RandomShader::vertex(const Model& model, const face_obj& f, int idx)
 {
     //                                    |  这里用std::get<>方法来提取tuple，第0项是vertex索引
     //                                   \|/
@@ -29,7 +29,7 @@ RandomShader::vertex(const face_obj& f, int idx)
 }
 
 std::pair<bool, TGAColor> 
-RandomShader::fragment(const vec3_f abg) const 
+RandomShader::fragment(const Model& model, const vec3_f abg) const 
 {
     TGAColor c = {static_cast<uint8_t>(color[0][0]*abg.alpha + color[1][0]*abg.beta + color[2][0]*abg.gamma),
                   static_cast<uint8_t>(color[0][1]*abg.alpha + color[1][1]*abg.beta + color[2][1]*abg.gamma),

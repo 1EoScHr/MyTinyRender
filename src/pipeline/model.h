@@ -28,11 +28,12 @@ public:
     vec4 getVertex(int idx) const;
     vec3f getVertexNormal(int idx) const;
     vec2_f getVertexTexture(int idx) const;
-    
-    vec3f getTexture_nm(vec2_f uv) const;
-    TGAColor getTexture_diff(vec2_f uv) const;
-    float getTexture_spec(vec2_f uv) const;
 
+    vec3f getTexture_nm(const vec2_f& uv) const;
+    TGAColor getTexture_diff(const vec2_f& uv) const;
+    float getTexture_spec(const vec2_f& uv) const;
+
+    Model() = default;
     Model(const std::string& _objFilePath, 
           const std::string& _nmFilePath =   "",
           const std::string& _diffFilePath = "",
@@ -46,8 +47,8 @@ private:
     const std::string diffFilePath; // 漫反射颜色纹理文件路径（可选）
     const std::string specFilePath; // 高光纹理文件路径（可选）
 
-    vec4 pos;                   // 模型系坐标原点在世界坐标系的位置
-    vec4 shift;                 // 模型
+    vec4 pos;                   // 模型空间坐标原点在世界空间坐标系的位置
+    vec4 shift;                 // 模型在模型空间内的位置
     std::array<double, 3> rotate;   // 模型当前绕各轴旋转角度
     mutable bool modelDirty;    // 模型操作脏位    // 脏位这种逻辑上不属于类的值状态的使用
 
