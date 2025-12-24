@@ -89,12 +89,14 @@ struct TGAImage {
     TGAColor get(const int x, const int y) const;
     void set(const int x, const int y, const TGAColor &c);
     void set(const int idx, const TGAColor &c); // 加一个重载
+    void clear(const TGAColor& c);              // 加一个用指定颜色清屏
+    const std::uint8_t* buffer(void) const;     // 返回底层data的内存地址，只读
     int width()  const; // const修饰成员函数本身，是用来获取私有变量w、h值的只读接口
     int height() const;
 private:
     bool   load_rle_data(std::ifstream &in);        // rle = run length encoding，是一种压缩连续相同像素的方式，tga常用
     bool unload_rle_data(std::ofstream &out) const; // 因此tga中数据是经过压缩的，所以读写前都要进行相应解码才能用
     int w = 0, h = 0;
-    std::uint8_t bpp = 0; // bits per pixel
+    std::uint8_t bpp = 0; // byte per pixel // fix：应该是byte，一开始以为是bit
     std::vector<std::uint8_t> data = {};
 };

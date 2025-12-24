@@ -20,12 +20,12 @@ Rasterization::renderOBJ(Model& model, Camera& camera, Shader& shader)
 {
     /* 一条渲染管线开始 */
 
-    std::cout << "绘制...";
+    // std::cout << "绘制...";
 
-    modelMat = model.getModelMat(); // 模型变换 Model
-    viewMat = camera.getViewMat();  // 视图变换 view/Camera
-    projMat = camera.getProjMat();  // 投影变换 Projection
-    viewPortMat = getViewPortMat(); // 视口变换 Viewport
+    if (model.getModelDirty()) modelMat = model.getModelMat();  // 模型变换 Model
+    if (camera.getViewDirty()) viewMat  = camera.getViewMat();  // 视图变换 view/Camera
+    if (camera.getProjDirty()) projMat  = camera.getProjMat();  // 投影变换 Projection
+    if (getViewPortDirty())    viewPortMat = getViewPortMat();  // 视口变换 Viewport
 
     shader.getMVP(modelMat, viewMat, projMat);
 
@@ -43,9 +43,8 @@ Rasterization::renderTriangle(const std::array<Vertex, 3>& screen, Shader& shade
 
     // 然后利用有向面积背面剔除器，一种优化，原理见历史commit的drawjusttriangle中的注释
     float s_ABC = computeArea(screen);
-    if (std::signbit(s_ABC)) return;
+    if (std::signbit(s_ABC)) return;        
     
-    #pragma omp parallel for    // 让编译器把其后的for循环并行化，在多核CPU上让不同线程分工执行循环迭代
     for(auto px = lb.first; px <= rt.first; px ++)
     {
         for(auto py = lb.second; py <= rt.second; py ++)
@@ -173,7 +172,7 @@ Rasterization::cheese(void)
     zbuffer2tga();
     buffer.write_tga_file("framebuffer.tga");
     if(showZbuffer) depthbuffer->write_tga_file("zbuffer.tga");
-    std::cout << "完毕" << std::endl;
+    // std::cout << "完毕" << std::endl;
 }
 
 void 
@@ -189,6 +188,12 @@ Rasterization::setShowZb(bool showzb, TGAImage* _depthbuffer)
     this->showZbuffer = showzb;
     this->depthbuffer = _depthbuffer;
     return;
+}
+
+void
+Rasterization::clearZb(void)
+{
+    zbuffer.clear();
 }
 
 void
@@ -264,6 +269,7 @@ Rasterization::getBbox(const std::array<Vertex, 3>& screen) // 获得BoundingBox
 void 
 Rasterization::faceTaskOnGPU(const Model& model, const std::vector<face_obj>& f, Shader& shader)
 {
+    // #pragma omp parallel for    // 让编译器把其后的for循环并行化，在多核CPU上让不同线程分工执行循环迭代
     for (auto& iter : f)    // 遍历模型所有面
     {   
         // 使用vertex shader获取面的各顶点，但是是裁剪坐标下

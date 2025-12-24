@@ -178,16 +178,6 @@ TGAColor TGAImage::get(const int x, const int y) const {
     return ret;
 }
 
-// 已废弃：~~以上面的get为原型，专用于zbuffer的从灰度图获取深度，是从[0, 255]到[-1, 1]的映射~~
-/*
-double TGAImage::getdepth(const int x, const int y) const{
-    if (!data.size() || x<0 || y<0 || x>=w || y>=h) return {};
-    const std::uint8_t *p = data.data()+(x+y*w)*bpp;
-    return (p[0]/127.5 - 1);
-}
-*/
-
-
 void TGAImage::set(int x, int y, const TGAColor &c) {
     if (!data.size() || x<0 || y<0 || x>=w || y>=h) return;
     memcpy(data.data()+(x+y*w)*bpp, c.bgra, bpp);
@@ -196,7 +186,50 @@ void TGAImage::set(int x, int y, const TGAColor &c) {
 // 以上面的set为原型进行重载
 void TGAImage::set(int idx, const TGAColor &c) {
     if (!data.size() || idx >= w*h) return;
-    memcpy(data.data()+idx*bpp, c.bgra, bpp);
+    memcpy(data.data()+idx*bpp, c.bgra, bpp);   // ？？？
+}
+
+// 纯色清屏
+void TGAImage::clear(const TGAColor& c) {
+    if (data.empty()) return;
+    const size_t N = static_cast<size_t>(w) * h;
+    uint8_t *p = data.data(); 
+
+    switch (bpp)
+    {
+        case GRAYSCALE:
+            for (size_t i = 0; i < N; ++ i) { p[i] = c[0]; } break;
+        case RGB:
+            for (size_t i = 0; i < N; ++ i)
+            {
+                p[i*3 + 0] = c[0];  // 完全消除内层小循环，极致紧凑
+                p[i*3 + 1] = c[1];
+                p[i*3 + 2] = c[2];
+            }
+            break;
+        case RGBA:
+            for (size_t i = 0; i < N; ++ i)
+            {
+                p[i*4 + 0] = c[0];
+                p[i*4 + 1] = c[1];
+                p[i*4 + 2] = c[2];
+                p[i*4 + 3] = c[3];
+            }
+            break;
+    }
+
+    for (size_t i = 0; i < data.size(); i += bpp)
+    {
+        for (int j = 0; j < bpp; ++ j) 
+        {
+            data[i + j] = c[j]; // 只拷贝前bpp字节，防止错乱 
+        }
+    }
+}
+
+const std::uint8_t* 
+TGAImage::buffer(void) const {
+    return data.data();
 }
 
 void TGAImage::flip_horizontally() {

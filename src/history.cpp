@@ -148,3 +148,24 @@ struct Pixel    // 只有几何信息，颜色交给shader获取
 
     // auto [zfar, znear] = std::ranges::minmax_element(v_copy, {}, &vec4_zf::z);
 */
+
+/*
+    // 非常早期的一个实现，已废弃：~~以上面的get为原型，专用于zbuffer的从灰度图获取深度，是从[0, 255]到[-1, 1]的映射~~
+    double TGAImage::getdepth(const int x, const int y) const{
+        if (!data.size() || x<0 || y<0 || x>=w || y>=h) return {};
+        const std::uint8_t *p = data.data()+(x+y*w)*bpp;
+        return (p[0]/127.5 - 1);
+    }
+*/
+
+/*
+    // 决定不允许在初始化之后更改透视/正交，因为没有什么意义
+    void 
+    Camera::setPersp(bool perspective)
+    {
+        this->perspective = perspective;
+        projDirty = true;
+        return;
+    }
+*/
+

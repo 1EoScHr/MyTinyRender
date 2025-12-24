@@ -20,9 +20,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|Intel")
 endif()
 
 find_package(OpenMP COMPONENTS CXX)
+find_package(SDL2 REQUIRED)
 
 set(SOURCES 
     src/main.cpp
+    src/realtime.cpp
 
     src/basic/tgaimage.cpp 
     
@@ -38,5 +40,6 @@ set(SOURCES
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 target_link_libraries(${PROJECT_NAME} PRIVATE $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+target_link_libraries(tinyrenderer PRIVATE SDL2::SDL2)
 
 file(GENERATE OUTPUT .gitignore CONTENT "*")

@@ -19,10 +19,20 @@ class Model
 {
 public:
     void setPos(vec4 newpos);           // 设定模型原点在世界坐标位置
-    void addShift(vec4 shift);          // 模型从自身原点位移
+    void addShift(vec4 shift);          // 模型从自身原点位移 // 但似乎用挺少？
     void setRotate(double rad, int axis);   // 改变某轴上的旋转角度
     mat4 getModelMat(void) const;       // 获取模型变换矩阵
     bool getModelDirty(void) const;
+
+    const vec4& getPos(void)
+    {
+        return pos;
+    }
+    const std::array<double, 3>&
+    getRot(void)
+    {
+        return rotate;
+    }
 
     const std::vector<face_obj>& getFace(void) const;
     vec4 getVertex(int idx) const;

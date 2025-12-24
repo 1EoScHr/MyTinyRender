@@ -27,6 +27,11 @@ struct ZBuffer
     float& operator()(const int x, const int y)       { assert(x>=0 && x<width && y>=0 && y<height); return depth[x + y*width];}
     float  operator()(const int x, const int y) const { assert(x>=0 && x<width && y>=0 && y<height); return depth[x + y*width];}
 
+    void clear(void)    // 清除zbuffer 
+    {
+        std::fill(depth.begin(), depth.end(), std::numeric_limits<float>::lowest());
+    }
+
     ZBuffer(int _width, int _height)
         : width(_width), height(_height)
     {
@@ -49,6 +54,13 @@ public:
     void setAxis(bool axis);
     void setShowZb(bool showzb, TGAImage* _depthbuffer);
     
+    void clearZb(void); // zbuffer清除
+
+    bool getViewPortDirty(void) const
+    {
+        return viewPortDirty;
+    }
+
     Rasterization(TGAImage& _buffer);
 
 private:

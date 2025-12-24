@@ -16,12 +16,6 @@ Camera::setPos(vec4 newPos)
     return;
 }
 
-vec4 
-Camera::getCamPos(void) const
-{
-    return e;
-}
-
 void 
 Camera::addShift(vec4 shift)
 {
@@ -56,14 +50,6 @@ Camera::setNearAndFar(double newNear, double newFar)
 
     this->near = newNear;
     this->far = newFar;
-    projDirty = true;
-    return;
-}
-
-void 
-Camera::setPersp(bool perspective)
-{
-    this->perspective = perspective;
     projDirty = true;
     return;
 }

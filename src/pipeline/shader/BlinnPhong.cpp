@@ -15,9 +15,9 @@ void
 BPShader_Flat::getMVP(const mat4& _M, const mat4& _V, const mat4& _P)
 {
     MV = _V * _M;
-    light = _V * light;    // DEBUG：light坐标为直观，应为世界坐标，也需要view变换
-    uintize(light);
-    _light = static_cast<vec3f>(light);
+    vec4 l = _V * light;    // DEBUG：light坐标为直观，应为世界坐标，也需要view变换
+    uintize(l);
+    _light = static_cast<vec3f>(l);
     P = _P;
 }
 

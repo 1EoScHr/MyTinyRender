@@ -24,16 +24,25 @@ public:
 
     // proj相关
     void setNearAndFar(double newNear, double newFar);
-    void setPersp(bool perspective);
     void setFov(double newFov);
     void setAspect(double newAspect);
 
     // 获取脏位
-    bool getViewDirty(void) const;
-    bool getProjDirty(void) const;
+    bool getViewDirty(void) const
+    {
+        return viewDirty;
+    }
+
+    bool getProjDirty(void) const
+    {
+        return projDirty;
+    }
 
     // 获取相机当前位置
-    vec4 getCamPos(void) const;
+    vec4 getCamPos(void) const
+    {
+        return e;
+    }
 
     // 主功能
     mat4 getViewMat(void) const;
@@ -53,7 +62,7 @@ private:
     double near, far;   // 相机最近/最远能看到的距离    // 更新：这里要用正值，以适应标准约定
     double left, right;
     double bottom, top;
-    bool perspective;       // 是否进行透视投影
+    bool perspective;       // 是否进行透视投影，要关闭就手动设置吧，没必要切换
 
     mutable bool viewDirty;         // 相机操作脏位
     mutable bool projDirty;         // 投影操作脏位
