@@ -67,19 +67,19 @@ void realtime(int width, int height, const TGAColor& bg, Model& model, Camera& c
             {
                 switch (event.key.keysym.sym)
                 {
-                    case SDLK_w     : new_model_pos.y += 1; pos_dirty = true; break;
-                    case SDLK_s     : new_model_pos.y -= 1; pos_dirty = true; break;
-                    case SDLK_a     : new_model_pos.x -= 1; pos_dirty = true; break;
-                    case SDLK_d     : new_model_pos.x += 1; pos_dirty = true; break;
-                    case SDLK_SPACE : new_model_pos.z += 1; pos_dirty = true; break;
-                    case SDLK_LSHIFT: new_model_pos.z -= 1; pos_dirty = true; break;
+                    case SDLK_w     : new_model_pos.y += 0.2; pos_dirty = true; break;
+                    case SDLK_s     : new_model_pos.y -= 0.2; pos_dirty = true; break;
+                    case SDLK_a     : new_model_pos.x += 0.2; pos_dirty = true; break;
+                    case SDLK_d     : new_model_pos.x -= 0.2; pos_dirty = true; break;
+                    case SDLK_SPACE : new_model_pos.z += 0.2; pos_dirty = true; break;
+                    case SDLK_LSHIFT: new_model_pos.z -=   1; pos_dirty = true; break;
 
-                    case SDLK_UP    : new_model_rot[0] += 1; rot_xd = true; break;
-                    case SDLK_DOWN  : new_model_rot[0] -= 1; rot_xd = true; break;
-                    case SDLK_LEFT  : new_model_rot[1] -= 1; rot_yd = true; break;
-                    case SDLK_RIGHT : new_model_rot[1] += 1; rot_yd = true; break;
-                    case SDLK_PAGEUP: new_model_rot[2] += 1; rot_zd = true; break;
-                    case SDLK_PAGEDOWN:new_model_rot[2] -= 1;rot_zd = true; break;
+                    case SDLK_UP    : new_model_rot[0] += 0.2; rot_xd = true; break;
+                    case SDLK_DOWN  : new_model_rot[0] -= 0.2; rot_xd = true; break;
+                    case SDLK_LEFT  : new_model_rot[1] -= 0.2; rot_yd = true; break;
+                    case SDLK_RIGHT : new_model_rot[1] += 0.2; rot_yd = true; break;
+                    case SDLK_PAGEUP: new_model_rot[2] += 0.2; rot_zd = true; break;
+                    case SDLK_PAGEDOWN:new_model_rot[2] -=0.2; rot_zd = true; break;
 
                     default: break;
                 }
