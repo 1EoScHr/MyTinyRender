@@ -113,6 +113,7 @@ Model::textureReader(void)
         }
 
         normalMap->flip_vertically();   // tga文件的原点是在左上角，所以脑子与实际是有一个y轴反转的，否则就出鬼图
+        uploadTex2GPU(normalMap, 2);
     }
 
     if (!diffFilePath.empty())
@@ -126,6 +127,7 @@ Model::textureReader(void)
         }
 
         diffMap->flip_vertically();
+        uploadTex2GPU(diffMap, 1);
     }
 
     if (!specFilePath.empty())
@@ -139,5 +141,6 @@ Model::textureReader(void)
         }
 
         specMap->flip_vertically();
+        uploadTex2GPU(specMap, 0);
     }
 }

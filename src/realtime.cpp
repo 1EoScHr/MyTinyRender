@@ -8,6 +8,7 @@
 #include "pipeline/shader/shader.h"
 #include "pipeline/rasterization.h"
 
+// #include "gperftools/profiler.h"
 #include <SDL2/SDL.h>
 
 void realtime(int width, int height, const TGAColor& bg, Model& model, Camera& camera, Shader& shader)
@@ -139,6 +140,8 @@ void realtime(int width, int height, const TGAColor& bg, Model& model, Camera& c
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+
+    // ProfilerStop();
 
     return;
 }

@@ -48,6 +48,7 @@ public:
           const std::string& _nmFilePath =   "",
           const std::string& _diffFilePath = "",
           const std::string& _specFilePath = ""); // 构造函数，如果不写就会默认为空
+    ~Model();
 
 private:
     void objReader(void);       // 模型.obj文件路径读取
@@ -76,4 +77,6 @@ private:
     std::unique_ptr<TGAImage> normalMap;    // 法线纹理（可选），智能指针，终于用到了，其会自动置空
     std::unique_ptr<TGAImage> diffMap;      // 漫反射颜色纹理（可选）
     std::unique_ptr<TGAImage> specMap;      // 高光纹理（可选）
+
+    void uploadTex2GPU(const std::unique_ptr<TGAImage>& tgaImg, int texType);
 };

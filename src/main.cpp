@@ -17,8 +17,8 @@
 
 int main(int argc, char** argv) 
 {
-    constexpr int width  = 256;
-    constexpr int height = 256;
+    constexpr int width  = 1024;
+    constexpr int height = 1024;
 
 // setting：渲染模式设置
     bool realTimeMode = false;  // 默认为离线模式
