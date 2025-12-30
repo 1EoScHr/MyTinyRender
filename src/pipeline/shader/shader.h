@@ -16,6 +16,8 @@
 #include "../../basic/tgaimage.h"
 #include "../model.h"
 #include "../camera.h"
+#include "shader.cuh"
+#include "../../basic/cuda_math.cuh"
 
 // 抽象着色器接口，定义了“着色器应该能够判断是否渲染、计算fragment的颜色”，但不定义如何计算。并且是一个“无状态”的。
 class Shader 
@@ -147,9 +149,31 @@ public:
     BPShader_GlobalNormalMap();
 };
 
+// 仅供 BPShader_GnmDiffSpec 上传 GPU 用（CPU侧结构）
+struct BP_Gnm_GPU_CPU
+{
+    mat4 MV;              // 用于 vnMV（左上角3x3）
+    vec3f light_view;     // view space 光源位置（你在 getMVP 里算出来的 light）
+    TGAColor lightColor;  // lightColor
+    float I, Ia, ka;      // 你 fragment 用到的就这些
+};
+
 class BPShader_GnmDiffSpec : public BPShader_GlobalNormalMap
 {
 public:
     BPShader_GnmDiffSpec();
     std::pair<bool, TGAColor> fragment(const Model& model, const vec3_f abg) const override;
+    BP_Gnm_GPU_CPU getGPUConstants() const
+    {
+        BP_Gnm_GPU_CPU c{};
+        c.MV = MV;
+        c.light_view = light;   // 已经是 view space
+        c.lightColor = lightColor;
+        c.I  = I;
+        c.Ia = Ia;
+        c.ka = ka;
+        return c;
+    }
+    vec3f getViewPos(int i) const { return ver[i]; }
+    vec2_f getUV(int i) const { return ver_t[i]; }
 };

@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cstring>
+#include <assert.h>
 
 TGAImage::TGAImage(const int w, const int h, const int bpp, TGAColor c) : w(w), h(h), bpp(bpp), data(w*h*bpp, 0) {
     for (int j=0; j<h; j++)
@@ -178,6 +179,15 @@ TGAColor TGAImage::get(const int x, const int y) const {
     return ret;
 }
 
+// 同样以上面的get为原型进行重载
+TGAColor TGAImage::get(const int idx) const {
+    if (!data.size() || idx >= w*h) return {};
+    TGAColor ret = {0, 0, 0, 0, bpp};
+    const std::uint8_t *p = data.data()+idx*bpp;
+    for (int i=bpp; i--; ret.bgra[i] = p[i]);
+    return ret;
+}
+
 void TGAImage::set(int x, int y, const TGAColor &c) {
     if (!data.size() || x<0 || y<0 || x>=w || y>=h) return;
     memcpy(data.data()+(x+y*w)*bpp, c.bgra, bpp);
@@ -186,7 +196,7 @@ void TGAImage::set(int x, int y, const TGAColor &c) {
 // 以上面的set为原型进行重载
 void TGAImage::set(int idx, const TGAColor &c) {
     if (!data.size() || idx >= w*h) return;
-    memcpy(data.data()+idx*bpp, c.bgra, bpp);   // ？？？
+    memcpy(data.data()+idx*bpp, c.bgra, bpp);
 }
 
 // 纯色清屏
@@ -228,7 +238,8 @@ void TGAImage::clear(const TGAColor& c) {
 }
 
 const std::uint8_t* 
-TGAImage::buffer(void) const {
+TGAImage::buffer(void) const 
+{
     return data.data();
 }
 

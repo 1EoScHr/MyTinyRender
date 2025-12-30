@@ -10,6 +10,7 @@
 #include <iostream>
 #include <array>
 
+// #include "cuda_math.cuh"    // 转换到GPU辅助
 #include "tgaimage.h"
 
 // 前向声明，在最后的矩阵x向量里，要实现3x1(4x1)矩阵与三维(四维)向量的转化，必须要选一个做前向声明
@@ -582,3 +583,4 @@ vec<n> operator*(const mat<n, n>& ma, const vec<n>& v)
 {
     return static_cast<vec<n>>(ma * mat<n, 1>(v));
 }
+

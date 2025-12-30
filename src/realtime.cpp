@@ -8,6 +8,10 @@
 #include "pipeline/shader/shader.h"
 #include "pipeline/rasterization.h"
 
+#include "pipeline/rasterization.cuh"
+#include "cuda_runtime.h"
+#include "pipeline/upload.cuh"
+
 #include <SDL2/SDL.h>
 
 void realtime(int width, int height, const TGAColor& bg, Model& model, Camera& camera, Shader& shader)
@@ -43,8 +47,11 @@ void realtime(int width, int height, const TGAColor& bg, Model& model, Camera& c
         width, height                   // 纹理尺寸
     );
 
+    // cpu端buffer建立
     TGAImage framebuffer(width, height, TGAImage::RGB, bg);
     Rasterization raster(framebuffer);
+
+    uploadRenderTarget(width, height);
 
     uint32_t lastTime = SDL_GetTicks();
     int frameCount = 0;
@@ -56,6 +63,8 @@ void realtime(int width, int height, const TGAColor& bg, Model& model, Camera& c
     bool rot_xd = false;
     bool rot_yd = false;
     bool rot_zd = false;
+
+    gpuInit(width, height, bg, model);
 
     bool running = true;
     SDL_Event event;
@@ -113,8 +122,9 @@ void realtime(int width, int height, const TGAColor& bg, Model& model, Camera& c
         }
 
         // 渲染
-        raster.renderOBJ(model, camera, shader);
-
+        // raster.renderOBJ(model, camera, shader);
+        gpuRenderFrame(model, camera, (BPShader_GnmDiffSpec&)shader, framebuffer, bg);
+        
         // 上传到 SDL
         SDL_UpdateTexture(texture, nullptr, framebuffer.buffer(), width * 3);
 
@@ -134,6 +144,7 @@ void realtime(int width, int height, const TGAColor& bg, Model& model, Camera& c
         }
     }
 
+    gpuShutdown();
     // 清理
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
